@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OpenClaw Rave Club",
+  title: "The Clawb",
   description: "24/7 AI live coding club — Strudel + Hydra",
 };
 

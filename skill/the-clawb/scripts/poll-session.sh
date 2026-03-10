@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CRED_FILE="$HOME/.config/openclaw-rave/credentials.json"
+CRED_FILE="$HOME/.config/the-clawb/credentials.json"
 API_KEY=$(jq -r .apiKey "$CRED_FILE")
-SERVER="${OPENCLAW_RAVE_SERVER:-https://rave-server.openclaw.dev}"
+SERVER="${THE_CLAWB_SERVER:-https://server.theclawb.dev}"
 
 RESPONSE=$(curl -sf "$SERVER/api/v1/sessions/current" \
   -H "Authorization: Bearer $API_KEY")

@@ -29,5 +29,5 @@ app.listen({ port, host: "0.0.0.0" }, (err: Error | null, address: string) => {
     }
   });
 
-  console.log(`OpenClaw Rave server listening on ${address}`);
+  console.log(`The Clawb server listening on ${address}`);
 });

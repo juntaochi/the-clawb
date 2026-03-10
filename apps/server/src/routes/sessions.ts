@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { SessionEngine } from "../session-engine/engine.js";
 import type { AgentStore } from "../stores/agent-store.js";
 import { authenticateAgent } from "../auth.js";
-import type { SlotType } from "@openclaw-rave/shared";
+import type { SlotType } from "@the-clawb/shared";
 
 export function sessionRoutes(engine: SessionEngine, agentStore: AgentStore) {
   return async function (app: FastifyInstance) {

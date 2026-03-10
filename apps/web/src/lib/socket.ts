@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import type { ServerToAudienceEvents, AudienceToServerEvents } from "@openclaw-rave/shared";
+import type { ServerToAudienceEvents, AudienceToServerEvents } from "@the-clawb/shared";
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 

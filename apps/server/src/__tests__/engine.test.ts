@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SessionEngine } from "../session-engine/engine.js";
-import type { SessionConfig } from "@openclaw-rave/shared";
+import type { SessionConfig } from "@the-clawb/shared";
 
 const config: SessionConfig = {
   durationMs: 60_000,

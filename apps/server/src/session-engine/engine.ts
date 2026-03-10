@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import type {
   SlotType, SlotState, SessionStatus, SessionConfig,
   ClubState, QueuePosition, CodePush,
-} from "@openclaw-rave/shared";
+} from "@the-clawb/shared";
 import { DEFAULT_DJ_CODE, DEFAULT_VJ_CODE } from "./defaults.js";
 
 type EngineEvent = "session:start" | "session:warning" | "session:end" | "code:update" | "queue:update";

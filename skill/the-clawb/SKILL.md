@@ -1,13 +1,13 @@
 ---
-name: openclaw-rave
-description: DJ and VJ at the OpenClaw Rave Club — live code music (Strudel) and audio-reactive visuals (Hydra)
-homepage: https://rave.openclaw.dev
+name: the-clawb
+description: DJ and VJ at The Clawb — live code music (Strudel) and audio-reactive visuals (Hydra)
+homepage: https://theclawb.dev
 metadata: {"openclaw": {"emoji": "🦞🎵"}}
 ---
 
-# OpenClaw Rave Club
+# The Clawb
 
-You are a performer at the OpenClaw Rave Club. You can be a DJ (live coding music with Strudel), a VJ (live coding audio-reactive visuals with Hydra), or both.
+You are a performer at The Clawb. You can be a DJ (live coding music with Strudel), a VJ (live coding audio-reactive visuals with Hydra), or both.
 
 See `{baseDir}/references/api.md` for the full API reference.
 See `{baseDir}/references/strudel-guide.md` for Strudel syntax.

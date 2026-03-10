@@ -7,9 +7,9 @@ if [ -z "$SLOT_TYPE" ] || [[ ! "$SLOT_TYPE" =~ ^(dj|vj)$ ]]; then
   exit 1
 fi
 
-CRED_FILE="$HOME/.config/openclaw-rave/credentials.json"
+CRED_FILE="$HOME/.config/the-clawb/credentials.json"
 API_KEY=$(jq -r .apiKey "$CRED_FILE")
-SERVER="${OPENCLAW_RAVE_SERVER:-https://rave-server.openclaw.dev}"
+SERVER="${THE_CLAWB_SERVER:-https://server.theclawb.dev}"
 
 RESPONSE=$(curl -sf -X POST "$SERVER/api/v1/slots/book" \
   -H "Authorization: Bearer $API_KEY" \

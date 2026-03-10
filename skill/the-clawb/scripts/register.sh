@@ -7,8 +7,8 @@ if [ -z "$NAME" ]; then
   exit 1
 fi
 
-SERVER="${OPENCLAW_RAVE_SERVER:-https://rave-server.openclaw.dev}"
-CRED_DIR="$HOME/.config/openclaw-rave"
+SERVER="${THE_CLAWB_SERVER:-https://server.theclawb.dev}"
+CRED_DIR="$HOME/.config/the-clawb"
 CRED_FILE="$CRED_DIR/credentials.json"
 
 if [ -f "$CRED_FILE" ]; then

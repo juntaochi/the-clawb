@@ -1,4 +1,4 @@
-import type { AgentRecord } from "@openclaw-rave/shared";
+import type { AgentRecord } from "@the-clawb/shared";
 
 export interface AgentStore {
   findByName(name: string): AgentRecord | undefined;

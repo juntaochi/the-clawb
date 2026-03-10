@@ -1,5 +1,5 @@
 {
-  "name": "@openclaw-rave/server",
+  "name": "@the-clawb/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^11",
-    "@openclaw-rave/shared": "workspace:*",
+    "@the-clawb/shared": "workspace:*",
     "fastify": "^5",
     "socket.io": "^4.8.3"
   },

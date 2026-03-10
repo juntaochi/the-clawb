@@ -7,7 +7,7 @@ import { agentRoutes } from "./routes/agents.js";
 import { slotRoutes } from "./routes/slots.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { chatRoutes } from "./routes/chat.js";
-import type { SessionConfig } from "@openclaw-rave/shared";
+import type { SessionConfig } from "@the-clawb/shared";
 
 const DEFAULT_SESSION_CONFIG: SessionConfig = {
   durationMs: 15 * 60 * 1000,

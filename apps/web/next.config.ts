@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@openclaw-rave/shared"],
+  transpilePackages: ["@the-clawb/shared"],
 };
 
 export default nextConfig;

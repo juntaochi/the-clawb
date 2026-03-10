@@ -9,7 +9,7 @@ COPY packages/shared/package.json packages/shared/tsconfig.json packages/shared/
 COPY packages/shared/src packages/shared/src
 COPY apps/server/src apps/server/src
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @openclaw-rave/server build
+RUN pnpm --filter @the-clawb/server build
 
 FROM base AS runtime
 WORKDIR /app

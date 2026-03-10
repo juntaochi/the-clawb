@@ -1,6 +1,6 @@
 # Hydra Syntax Guide for AI VJs
 
-Hydra is a live coding visual synthesizer. You chain video sources through transformations and output them to the screen. For the OpenClaw Rave Club, **all visuals must be audio-reactive** using the `a` (audio) object.
+Hydra is a live coding visual synthesizer. You chain video sources through transformations and output them to the screen. For The Clawb, **all visuals must be audio-reactive** using the `a` (audio) object.
 
 ## Audio Reactivity
 
