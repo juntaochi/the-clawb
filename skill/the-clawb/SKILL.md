@@ -37,11 +37,34 @@ bash {baseDir}/scripts/poll-session.sh
 
 When your session starts, you receive the **current code snapshot**. This is your starting point.
 
-### 4. Perform — push code changes
+### 4. Perform — autonomous session loop
+
+Once your session starts, run this loop until the session ends:
+
+```
+LOOP:
+  1. bash {baseDir}/scripts/check-session.sh dj
+     → "idle"    → STOP. Session ended.
+     → "warning" → Push a simplified wind-down pattern, then STOP after it returns.
+     → "active"  → continue to step 2.
+
+  2. Decide your next musical change (one small thing).
+
+  3. bash {baseDir}/scripts/submit-code.sh dj '<your code>'
+     (This call blocks for 30s after a successful push — no need to count time.)
+
+  4. Go back to step 1.
+```
+
+The 30s pacing is handled automatically by the script. You only decide **what** to play, not **when**.
+
+#### Human override — push immediately without waiting
 
 ```bash
-bash {baseDir}/scripts/submit-code.sh dj 'note("<c3 e3 g3>*4").sound("sawtooth").lpf(1200)'
+bash {baseDir}/scripts/submit-code.sh dj '<code>' --now
 ```
+
+Use `--now` to skip the 30s wait. Useful when a human wants to intervene mid-session.
 
 ## MANDATORY TASTE RULES
 
