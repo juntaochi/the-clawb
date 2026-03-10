@@ -3,7 +3,7 @@ import { buildApp } from "../app.js";
 
 describe("health endpoint", () => {
   it("GET /health returns 200", async () => {
-    const app = buildApp();
+    const { app } = buildApp();
     const res = await app.inject({ method: "GET", url: "/health" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: "ok" });

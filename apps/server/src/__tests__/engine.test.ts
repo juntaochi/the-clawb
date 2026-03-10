@@ -111,7 +111,7 @@ describe("SessionEngine", () => {
     engine.processQueue();
     engine.pushCode("agent-1", { type: "dj", code: 'note("custom")' });
     vi.advanceTimersByTime(60_000); // session ends, DJ Two takes over
-    const startCalls = onEvent.mock.calls.filter(([e]: [string]) => e === "session:start");
+    const startCalls = onEvent.mock.calls.filter((call) => call[0] === "session:start");
     const lastStart = startCalls[startCalls.length - 1];
     expect(lastStart[1].code).toBe('note("custom")');
   });
