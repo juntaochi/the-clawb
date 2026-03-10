@@ -144,6 +144,63 @@ sound("bd bd bd bd")                                    // push 1: just kicks
 stack(sound("bd bd bd bd"), sound("hh*8").gain(0.3))   // push 2: add hats
 ```
 
+## Tempo / BPM
+
+Strudel works in **cycles**, not beats. To convert BPM:
+
+```js
+setcpm(120/4)   // 120 BPM with 4 beats per cycle (most common)
+setcpm(90/4)    // 90 BPM with 4 beats per cycle
+setcpm(140/4)   // 140 BPM techno
+```
+
+Or per-pattern (doesn't change global tempo):
+```js
+s("bd sd hh sd").cpm(90)   // this pattern at 90 BPM (1 beat = 1 cycle)
+```
+
+Rule of thumb: if your pattern has 4 steps and you want 120 BPM, use `setcpm(120/4)`.
+
+Default is `setcpm(30)` — 1 cycle every 2 seconds.
+
+## Signal Oscillators as Pattern Values
+
+Use LFOs to animate parameters over time:
+
+```js
+sine.range(200, 4000)    // sine wave oscillating between 200 and 4000
+saw.range(0.1, 0.9)      // sawtooth from 0.1 to 0.9
+rand.range(0, 1)         // random value each cycle
+```
+
+Examples:
+```js
+note("c3*8").sound("sawtooth").lpf(sine.range(300, 3000))  // filter sweep
+sound("hh*8").pan(sine.range(0, 1))                        // auto-pan
+sound("bd*4").gain(saw.range(0.4, 0.9))                    // rising gain
+```
+
+## Common Pitfalls (AI-specific)
+
+These are frequent mistakes LLMs make with Strudel:
+
+| Wrong | Correct | Why |
+|---|---|---|
+| `bpm(120)` | `setcpm(120/4)` | No `bpm()` function in Strudel |
+| `setcps(2)` for 120 BPM | `setcpm(120/4)` | `setcps` is Hz, not intuitive |
+| `{bd sd}` | `[bd sd]` | `{}` is TidalCycles polyrhythm, not Strudel |
+| `note("c4") # gain 0.5` | `note("c4").gain(0.5)` | `#` is Haskell, not JS |
+| `d1 $ sound "bd"` | `sound("bd")` | `d1 $` is TidalCycles, not Strudel |
+| `note("c")` | `note("c4")` | Always include octave number |
+| `.sound("sawtooth wave")` | `.sound("sawtooth")` | No "wave" suffix |
+| `stack([pat1, pat2])` | `stack(pat1, pat2)` | `stack` takes spread args, not array |
+
+**Mini-notation confusion:**
+- `"a b"` = sequence (a then b, equal time)
+- `"[a b]"` = sub-sequence (a and b squeezed into one step)
+- `"<a b>"` = alternate (a on cycle 1, b on cycle 2)
+- `","` = parallel (use inside `sound()` or wrap with `stack()`)
+
 ## Complete Examples
 
 ### Minimal Techno

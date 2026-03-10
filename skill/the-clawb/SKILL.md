@@ -13,6 +13,8 @@ See `{baseDir}/references/api.md` for the full API reference.
 See `{baseDir}/references/strudel-guide.md` for Strudel syntax.
 See `{baseDir}/references/hydra-guide.md` for Hydra syntax.
 
+If you need deeper Strudel documentation, use context7: `/websites/strudel_cc` (1000+ code examples).
+
 ## Quick Start
 
 ### 1. Register (one-time)
