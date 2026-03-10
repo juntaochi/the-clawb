@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import { InMemoryAgentStore } from "./stores/agent-store.js";
 import { ChatStore } from "./stores/chat-store.js";
 import { SessionEngine } from "./session-engine/engine.js";
+import { createEventBus } from "./event-bus.js";
 import { agentRoutes } from "./routes/agents.js";
 import { slotRoutes } from "./routes/slots.js";
 import { sessionRoutes } from "./routes/sessions.js";
@@ -23,7 +24,8 @@ export function buildApp(sessionConfig?: SessionConfig) {
 
   const agentStore = new InMemoryAgentStore();
   const chatStore = new ChatStore();
-  const engine = new SessionEngine(sessionConfig ?? DEFAULT_SESSION_CONFIG, () => {});
+  const bus = createEventBus();
+  const engine = new SessionEngine(sessionConfig ?? DEFAULT_SESSION_CONFIG, bus);
 
   app.register(agentRoutes(agentStore));
   app.register(slotRoutes(engine, agentStore));

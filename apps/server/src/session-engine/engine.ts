@@ -4,9 +4,7 @@ import type {
   ClubState, QueuePosition, CodePush,
 } from "@the-clawb/shared";
 import { DEFAULT_DJ_CODE, DEFAULT_VJ_CODE } from "./defaults.js";
-
-type EngineEvent = "session:start" | "session:warning" | "session:end" | "code:update" | "queue:update";
-type EventCallback = (event: EngineEvent, data: unknown) => void;
+import { ClubEventBus } from "../event-bus.js";
 
 interface ActiveSession {
   id: string;
@@ -27,17 +25,13 @@ export class SessionEngine {
   private vjSession: ActiveSession | null = null;
   private queue: QueuePosition[] = [];
   private config: SessionConfig;
-  private onEvent: EventCallback;
+  private bus: ClubEventBus;
 
-  constructor(config: SessionConfig, onEvent: EventCallback) {
+  constructor(config: SessionConfig, bus: ClubEventBus) {
     this.config = config;
-    this.onEvent = onEvent;
+    this.bus = bus;
     this.djCode = DEFAULT_DJ_CODE;
     this.vjCode = DEFAULT_VJ_CODE;
-  }
-
-  setEventCallback(cb: EventCallback): void {
-    this.onEvent = cb;
   }
 
   getClubState(): ClubState {
@@ -61,7 +55,7 @@ export class SessionEngine {
     const entry: QueuePosition = { agentId, agentName, slotType, bookedAt: Date.now() };
     this.queue.push(entry);
     const position = this.queue.filter((q) => q.slotType === slotType).length - 1;
-    this.onEvent("queue:update", { queue: this.queue });
+    this.bus.emit("queue:update", { queue: this.queue });
     return { position };
   }
 
@@ -90,7 +84,7 @@ export class SessionEngine {
     else this.vjCode = push.code;
     session.lastPushAt = now;
 
-    this.onEvent("code:update", { type: push.type, code: push.code, agentName: session.agentName });
+    this.bus.emit("code:update", { type: push.type, code: push.code, agentName: session.agentName });
     return { ok: true };
   }
 
@@ -103,7 +97,7 @@ export class SessionEngine {
     if (type === "dj") this.djSession = null;
     else this.vjSession = null;
 
-    this.onEvent("session:end", { type });
+    this.bus.emit("session:end", { type });
     this.processQueue();
   }
 
@@ -122,7 +116,7 @@ export class SessionEngine {
     };
 
     session.warningTimer = setTimeout(() => {
-      this.onEvent("session:warning", { type: entry.slotType, endsIn: this.config.warningMs });
+      this.bus.emit("session:warning", { type: entry.slotType, endsIn: this.config.warningMs });
     }, this.config.durationMs - this.config.warningMs);
 
     session.endTimer = setTimeout(() => {
@@ -133,7 +127,7 @@ export class SessionEngine {
     else this.vjSession = session;
 
     const code = entry.slotType === "dj" ? this.djCode : this.vjCode;
-    this.onEvent("session:start", {
+    this.bus.emit("session:start", {
       type: entry.slotType,
       code,
       startsAt: session.startedAt,

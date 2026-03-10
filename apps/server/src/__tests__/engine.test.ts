@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SessionEngine } from "../session-engine/engine.js";
+import { createEventBus, type ClubEventBus } from "../event-bus.js";
 import type { SessionConfig } from "@the-clawb/shared";
 
 const config: SessionConfig = {
@@ -11,12 +12,17 @@ const config: SessionConfig = {
 
 describe("SessionEngine", () => {
   let engine: SessionEngine;
+  let bus: ClubEventBus;
   let onEvent: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.useFakeTimers();
+    bus = createEventBus();
     onEvent = vi.fn();
-    engine = new SessionEngine(config, onEvent);
+    for (const ev of ["session:start", "session:warning", "session:end", "code:update", "queue:update"] as const) {
+      bus.on(ev, (data) => onEvent(ev, data));
+    }
+    engine = new SessionEngine(config, bus);
   });
 
   afterEach(() => {
