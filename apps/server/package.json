@@ -11,14 +11,15 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@fastify/cors": "^11",
     "@openclaw-rave/shared": "workspace:*",
     "fastify": "^5",
-    "@fastify/cors": "^11"
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@types/node": "^22",
     "tsx": "^4",
-    "vitest": "^3",
-    "@types/node": "^22"
+    "typescript": "^5",
+    "vitest": "^3"
   }
 }

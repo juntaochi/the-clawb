@@ -36,6 +36,10 @@ export class SessionEngine {
     this.vjCode = DEFAULT_VJ_CODE;
   }
 
+  setEventCallback(cb: EventCallback): void {
+    this.onEvent = cb;
+  }
+
   getClubState(): ClubState {
     return {
       dj: this.getSlotState("dj"),
