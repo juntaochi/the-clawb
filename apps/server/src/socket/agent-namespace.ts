@@ -24,13 +24,7 @@ export function setupAgentNamespace(io: Server, engine: SessionEngine, agentStor
     socket.on("code:push", (data) => {
       const result = engine.pushCode(agentId, data);
       socket.emit("code:ack", result);
-      if (result.ok) {
-        io.of("/audience").emit("code:update", {
-          type: data.type,
-          code: data.code,
-          agentName: socket.data.agentName,
-        });
-      }
+      // broadcast handled by bus → broadcaster
     });
 
     socket.on("chat:send", (data) => {
