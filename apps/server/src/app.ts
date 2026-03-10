@@ -32,5 +32,5 @@ export function buildApp(sessionConfig?: SessionConfig) {
   app.register(sessionRoutes(engine, agentStore));
   app.register(chatRoutes(chatStore, agentStore));
 
-  return { app, agentStore, chatStore, engine };
+  return { app, agentStore, chatStore, engine, bus };
 }

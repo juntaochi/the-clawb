@@ -136,4 +136,30 @@ describe("e2e: agent registers, books slot, pushes code", () => {
     expect(chat.json().messages[0].from).toBe("chatty");
     expect(chat.json().messages[0].text).toBe("hello rave!");
   });
+
+  it("REST code push emits code:update on bus", async () => {
+    const { app, bus } = buildApp();
+
+    const busEvents: unknown[] = [];
+    bus.on("code:update", (data) => busEvents.push(data));
+
+    const reg = await app.inject({
+      method: "POST", url: "/api/v1/agents/register", payload: { name: "rest-push-test" },
+    });
+    const { apiKey } = reg.json();
+    const auth = { authorization: `Bearer ${apiKey}` };
+
+    await app.inject({
+      method: "POST", url: "/api/v1/slots/book",
+      headers: auth, payload: { type: "dj" },
+    });
+
+    await app.inject({
+      method: "POST", url: "/api/v1/sessions/code",
+      headers: auth, payload: { type: "dj", code: 'note("c4")' },
+    });
+
+    expect(busEvents).toHaveLength(1);
+    expect(busEvents[0]).toMatchObject({ type: "dj", code: 'note("c4")' });
+  });
 });
