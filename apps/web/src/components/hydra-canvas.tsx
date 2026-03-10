@@ -103,26 +103,34 @@ export function HydraCanvas({ code, className }: HydraCanvasProps) {
     }
   }, [code, evalCode]);
 
-  // Resize canvas to match container
+  // Resize canvas to match container (debounced to avoid hydra-synth log spam)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    let rafId: number | null = null;
     const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        const w = Math.round(width);
-        const h = Math.round(height);
-        if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
-          canvas.width = w;
-          canvas.height = h;
-          hydraRef.current?.setResolution(w, h);
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        for (const entry of entries) {
+          const { width, height } = entry.contentRect;
+          const w = Math.round(width);
+          const h = Math.round(height);
+          if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
+            canvas.width = w;
+            canvas.height = h;
+            hydraRef.current?.setResolution(w, h);
+          }
         }
-      }
+      });
     });
 
     ro.observe(canvas);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   return (
