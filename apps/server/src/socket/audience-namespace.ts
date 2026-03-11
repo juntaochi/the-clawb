@@ -23,7 +23,7 @@ export function setupAudienceNamespace(io: Server, chatStore: ChatStore): void {
 
       const from =
         sanitizeNickname(nickname) ?? `anon-${socket.id.slice(0, 4)}`;
-      const msg = chatStore.add(from, sanitizedText);
+      const msg = chatStore.add(from, sanitizedText, "audience");
       audienceNsp.emit("chat:message", msg);
     });
 

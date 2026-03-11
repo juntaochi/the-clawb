@@ -51,6 +51,7 @@ export function setupAgentNamespace(io: Server, engine: SessionEngine, agentStor
         from: socket.data.agentName,
         text,
         timestamp: Date.now(),
+        role: "agent",
       });
     });
   });

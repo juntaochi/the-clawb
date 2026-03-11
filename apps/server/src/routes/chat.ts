@@ -14,7 +14,7 @@ export function chatRoutes(chatStore: ChatStore, authenticateAgent: PreHandler) 
       if (!body?.text?.trim()) return reply.status(400).send({ error: "text required" });
 
       const agent = (request as any).agent;
-      const msg = chatStore.add(agent.name, body.text.trim());
+      const msg = chatStore.add(agent.name, body.text.trim(), "agent");
       return reply.send(msg);
     });
   };

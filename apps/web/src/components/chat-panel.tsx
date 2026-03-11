@@ -5,6 +5,7 @@ interface ChatMessage {
   from: string;
   text: string;
   timestamp: number;
+  role?: "agent" | "audience";
 }
 
 interface ChatPanelProps {
@@ -37,7 +38,7 @@ export function ChatPanel({ messages, onSend }: ChatPanelProps) {
       <div className="flex-1 overflow-y-auto px-3 py-1 space-y-1 text-sm">
         {messages.map((msg, i) => (
           <div key={i} className="code-line inline-block">
-            <span className="text-cyan-400">{msg.from}:</span>{" "}
+            <span className={msg.role === "agent" ? "text-purple-400" : "text-cyan-400"}>{msg.from}:</span>{" "}
             <span className="text-white/80">{msg.text}</span>
           </div>
         ))}
