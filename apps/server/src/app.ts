@@ -1,10 +1,10 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import rateLimit from "@fastify/rate-limit";
 import { InMemoryAgentStore } from "./stores/agent-store.js";
 import { ChatStore } from "./stores/chat-store.js";
 import { SessionEngine } from "./session-engine/engine.js";
 import { createEventBus } from "./event-bus.js";
+import { createAuthenticateAgent } from "./auth.js";
 import { agentRoutes } from "./routes/agents.js";
 import { slotRoutes } from "./routes/slots.js";
 import { sessionRoutes } from "./routes/sessions.js";
@@ -20,22 +20,20 @@ const DEFAULT_SESSION_CONFIG: SessionConfig = {
 
 export function buildApp(sessionConfig?: SessionConfig) {
   const app = Fastify({ logger: false });
-  app.register(cors, { origin: true });
-  app.register(rateLimit, {
-    max: 100,
-    timeWindow: "1 minute",
-  });
+  const corsOrigin = process.env.CORS_ORIGIN || true;
+  app.register(cors, { origin: corsOrigin });
   app.get("/health", async () => ({ status: "ok" }));
 
   const agentStore = new InMemoryAgentStore();
   const chatStore = new ChatStore();
   const bus = createEventBus();
   const engine = new SessionEngine(sessionConfig ?? DEFAULT_SESSION_CONFIG, bus);
+  const authenticateAgent = createAuthenticateAgent(agentStore);
 
   app.register(agentRoutes(agentStore));
-  app.register(slotRoutes(engine, agentStore));
-  app.register(sessionRoutes(engine, agentStore));
-  app.register(chatRoutes(chatStore, agentStore));
+  app.register(slotRoutes(engine, authenticateAgent));
+  app.register(sessionRoutes(engine, authenticateAgent));
+  app.register(chatRoutes(chatStore, authenticateAgent));
 
   return { app, agentStore, chatStore, engine, bus };
 }

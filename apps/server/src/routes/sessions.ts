@@ -1,10 +1,10 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { SessionEngine } from "../session-engine/engine.js";
-import type { AgentStore } from "../stores/agent-store.js";
-import { authenticateAgent } from "../auth.js";
-import type { SlotType } from "@the-clawb/shared";
+import { isValidSlotType, isNonEmptyString } from "../validation.js";
 
-export function sessionRoutes(engine: SessionEngine, agentStore: AgentStore) {
+type PreHandler = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+
+export function sessionRoutes(engine: SessionEngine, authenticateAgent: PreHandler) {
   return async function (app: FastifyInstance) {
     app.get("/api/v1/sessions/current", async () => {
       const state = engine.getClubState();
@@ -23,12 +23,15 @@ export function sessionRoutes(engine: SessionEngine, agentStore: AgentStore) {
       if (!body?.type || !body?.code) {
         return reply.status(400).send({ error: "type and code required" });
       }
+      if (!isValidSlotType(body.type)) {
+        return reply.status(400).send({ error: "type must be 'dj' or 'vj'" });
+      }
+      if (!isNonEmptyString(body.code)) {
+        return reply.status(400).send({ error: "code must be a non-empty string" });
+      }
 
-      const hash = (request as any).apiKeyHash as string;
-      const agent = agentStore.findByApiKeyHash(hash);
-      if (!agent) return reply.status(401).send({ error: "Unknown agent" });
-
-      const result = engine.pushCode(agent.id, { type: body.type as SlotType, code: body.code });
+      const agent = (request as any).agent;
+      const result = engine.pushCode(agent.id, { type: body.type, code: body.code });
       if (!result.ok) return reply.status(403).send(result);
       return reply.send(result);
     });

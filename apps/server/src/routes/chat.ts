@@ -1,31 +1,29 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { ChatStore } from "../stores/chat-store.js";
-import { authenticateAgent } from "../auth.js";
-import type { AgentStore } from "../stores/agent-store.js";
+import { sanitizeChatText } from "../validation.js";
+import { PerKeyRateLimiter } from "../rate-limit.js";
 
-export function chatRoutes(chatStore: ChatStore, agentStore: AgentStore) {
+type PreHandler = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+
+export function chatRoutes(chatStore: ChatStore, authenticateAgent: PreHandler) {
+  const chatLimiter = new PerKeyRateLimiter(1000);
+
   return async function (app: FastifyInstance) {
     app.get("/api/v1/chat/recent", async () => {
       return { messages: chatStore.recent() };
     });
 
-    app.post("/api/v1/chat/send", {
-      preHandler: authenticateAgent,
-      config: {
-        rateLimit: {
-          max: 30,
-          timeWindow: "1 minute",
-        },
-      },
-    }, async (request, reply) => {
+    app.post("/api/v1/chat/send", { preHandler: authenticateAgent }, async (request, reply) => {
+      const agent = (request as any).agent;
+      if (!chatLimiter.allow(agent.id)) {
+        return reply.status(429).send({ error: "Too many messages — wait 1 second" });
+      }
+
       const body = request.body as { text?: string } | undefined;
-      if (!body?.text?.trim()) return reply.status(400).send({ error: "text required" });
+      const text = sanitizeChatText(body?.text);
+      if (!text) return reply.status(400).send({ error: "text required" });
 
-      const hash = (request as any).apiKeyHash as string;
-      const agent = agentStore.findByApiKeyHash(hash);
-      const name = agent?.name ?? "anonymous";
-
-      const msg = chatStore.add(name, body.text.trim());
+      const msg = chatStore.add(agent.name, text, "agent");
       return reply.send(msg);
     });
   };

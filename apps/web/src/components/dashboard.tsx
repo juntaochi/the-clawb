@@ -9,7 +9,6 @@ import { ChatPanel } from "./chat-panel";
 import { StatusBar } from "./status-bar";
 import { useClubSocket } from "../hooks/use-club-socket";
 import { useStrudelAudioBridge } from "../hooks/use-strudel-audio-bridge";
-import { getAudienceSocket } from "../lib/socket";
 
 export function Dashboard() {
   const {
@@ -22,11 +21,22 @@ export function Dashboard() {
     sendChat,
   } = useClubSocket();
 
-  const { activate, analyserNode } = useStrudelAudioBridge();
+  const {
+    handleAudioData,
+    setHydraFftSender,
+    bridgeActive,
+    scopeData,
+    freqData,
+  } = useStrudelAudioBridge();
 
-  const handleStrudelReady = useCallback(() => {
-    activate();
-  }, [activate]);
+  // When the Hydra sandbox is ready, register its FFT sender so the audio
+  // bridge can forward Strudel's FFT data to Hydra for audio-reactive visuals.
+  const handleHydraBridgeReady = useCallback(
+    (sendFft: (fft: number[]) => void) => {
+      setHydraFftSender(sendFft);
+    },
+    [setHydraFftSender]
+  );
 
   return (
     <div className="relative h-screen bg-black">
@@ -34,9 +44,7 @@ export function Dashboard() {
       <HydraCanvas
         code={vjCode}
         className="fixed inset-0 w-screen h-screen z-0"
-        onEvalError={(error) => {
-          getAudienceSocket().emit("code:error", { type: "vj", error });
-        }}
+        onBridgeReady={handleHydraBridgeReady}
       />
 
       {/* UI overlay — text/UI elements have dark backdrop, rest is transparent */}
@@ -49,7 +57,9 @@ export function Dashboard() {
                 <CodePanel code={djCode} label="DJ (Strudel)" />
               </div>
               <StrudelScope
-                analyserNode={analyserNode}
+                scopeData={scopeData}
+                freqData={freqData}
+                active={bridgeActive}
                 className="h-24 shrink-0"
               />
             </div>
@@ -81,13 +91,10 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Strudel audio engine (invisible, positioned fixed) */}
+      {/* Strudel audio engine (invisible sandboxed iframe) */}
       <StrudelPlayer
         code={djCode}
-        onReady={handleStrudelReady}
-        onEvalError={(error) => {
-          getAudienceSocket().emit("code:error", { type: "dj", error });
-        }}
+        onAudioData={handleAudioData}
       />
     </div>
   );
