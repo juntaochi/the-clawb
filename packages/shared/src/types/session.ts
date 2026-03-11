@@ -10,6 +10,7 @@ export interface SlotState {
   code: string;
   startedAt: number | null;
   endsAt: number | null;
+  lastError: { error: string; at: number } | null;
 }
 
 export interface SessionConfig {

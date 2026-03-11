@@ -33,6 +33,7 @@ export function setupBroadcaster(io: Server, bus: ClubEventBus, engine: SessionE
 
   bus.on("code:error", (data) => {
     const d = data as { type: string; error: string; agentId: string };
+    engine.setLastError(d.type as "dj" | "vj", d.error);
     agentNsp.to(`agent:${d.agentId}`).emit("code:error", { type: d.type, error: d.error });
   });
 

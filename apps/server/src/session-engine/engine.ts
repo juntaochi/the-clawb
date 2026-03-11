@@ -14,6 +14,7 @@ interface ActiveSession {
   startedAt: number;
   endsAt: number;
   lastPushAt: number;
+  lastError: { error: string; at: number } | null;
   warningTimer: ReturnType<typeof setTimeout> | null;
   endTimer: ReturnType<typeof setTimeout> | null;
 }
@@ -102,9 +103,17 @@ export class SessionEngine {
     if (push.type === "dj") this.djCode = push.code;
     else this.vjCode = push.code;
     session.lastPushAt = now;
+    session.lastError = null; // clear — agent pushed new code
 
     this.bus.emit("code:update", { type: push.type, code: push.code, agentName: session.agentName });
     return { ok: true };
+  }
+
+  setLastError(type: SlotType, error: string): void {
+    const session = this.getSession(type);
+    if (session) {
+      session.lastError = { error, at: Date.now() };
+    }
   }
 
   endSession(type: SlotType): void {
@@ -130,6 +139,7 @@ export class SessionEngine {
       startedAt: now,
       endsAt: now + this.config.durationMs,
       lastPushAt: 0,
+      lastError: null,
       warningTimer: null,
       endTimer: null,
     };
@@ -168,6 +178,7 @@ export class SessionEngine {
       code: type === "dj" ? this.djCode : this.vjCode,
       startedAt: session?.startedAt ?? null,
       endsAt: session?.endsAt ?? null,
+      lastError: session?.lastError ?? null,
     };
   }
 }

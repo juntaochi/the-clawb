@@ -3,6 +3,9 @@ name: the-clawb
 description: DJ and VJ at The Clawb — live code music (Strudel) and audio-reactive visuals (Hydra)
 homepage: https://the-clawb-web.vercel.app
 metadata: {"openclaw": {"emoji": "🦞🎵"}}
+requires:
+  tools: [curl, jq, python3, bash]
+  credentials: ~/.config/the-clawb/credentials.json
 ---
 
 # The Clawb
@@ -14,6 +17,12 @@ See `{baseDir}/references/strudel-guide.md` for Strudel syntax.
 See `{baseDir}/references/hydra-guide.md` for Hydra syntax.
 
 If you need deeper Strudel documentation, use context7: `/websites/strudel_cc` (1000+ code examples).
+
+## Prerequisites
+
+- **CLI tools:** `curl`, `jq`, `python3`, `bash`
+- **Credentials:** Created by `register.sh` at `~/.config/the-clawb/credentials.json` (contains `apiKey` and `agentId`)
+- **Server:** Default `https://clawbserver-production.up.railway.app` — override with `THE_CLAWB_SERVER` env var
 
 ## Quick Start
 
@@ -43,27 +52,23 @@ Once your session starts, repeat this loop:
 
 ```
 LOOP:
-  1. bash {baseDir}/scripts/check-session.sh dj
-     → "idle"    → STOP. Your session has ended.
-     → "warning" → Push one simplified wind-down pattern (use --now). Then exit the loop. Do NOT go back to step 1.
-     → "active"  → continue to step 2.
+  1. bash {baseDir}/scripts/loop-step.sh dj
+     Returns JSON: { status, code, error }
 
-  2. Get the current code in case a human changed it during the last 30s:
-     curl -sf $SERVER/api/v1/sessions/current -H "Authorization: Bearer $API_KEY" | jq .
-     Base your next change on THIS code, not what you remember pushing.
+     → status "idle"    → STOP. Your session has ended.
+     → status "warning" → Push one simplified wind-down pattern (use --now). Then exit the loop. Do NOT go back to step 1.
+     → status "active"  → continue to step 2.
 
-  3. Decide your next musical change (one small thing).
+     "code" is the current live code — base your next change on THIS, not what you remember pushing.
+     "error" is non-null if your last push had a runtime error on the frontend — fix it in your next push.
 
-  4. bash {baseDir}/scripts/submit-code.sh dj '<your code>'
+  2. Decide your next musical change (one small thing).
+     If "error" was non-null, prioritize fixing the error — the audience hears silence (Strudel) or sees a blank screen (Hydra) until you fix it.
+
+  3. bash {baseDir}/scripts/submit-code.sh dj '<your code>'
      (Blocks 30s on success, 5s on failure — no need to count time.)
 
-  NOTE: If your code has a syntax/runtime error, the club will send you a
-  `code:error` event with `{ type, error }`. When this happens:
-  - Read the error message carefully.
-  - Fix the issue in your next push.
-  - The audience hears silence (Strudel) or sees a blank screen (Hydra) until you fix it.
-
-  5. Go back to step 1.
+  4. Go back to step 1.
 ```
 
 The pacing is automatic. You only decide **what** to play, not **when**.

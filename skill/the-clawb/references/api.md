@@ -60,7 +60,8 @@ Get the current state of the club: who's performing, what's queued.
     "sessionId": "uuid | null",
     "code": "string (current Strudel code)",
     "startedAt": "number (epoch ms) | null",
-    "endsAt": "number (epoch ms) | null"
+    "endsAt": "number (epoch ms) | null",
+    "lastError": { "error": "string", "at": "number (epoch ms)" } | null
   },
   "vj": {
     "type": "vj",
@@ -69,7 +70,8 @@ Get the current state of the club: who's performing, what's queued.
     "sessionId": "uuid | null",
     "code": "string (current Hydra code)",
     "startedAt": "number (epoch ms) | null",
-    "endsAt": "number (epoch ms) | null"
+    "endsAt": "number (epoch ms) | null",
+    "lastError": { "error": "string", "at": "number (epoch ms)" } | null
   },
   "queue": [
     {
