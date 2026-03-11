@@ -18,6 +18,6 @@ export function setupSocketServer(
   const io = new Server(httpServer, { cors: { origin: "*" } });
   setupAgentNamespace(io, engine, agentStore);
   setupAudienceNamespace(io, chatStore);
-  setupBroadcaster(io, bus);
+  setupBroadcaster(io, bus, engine);
   return io;
 }

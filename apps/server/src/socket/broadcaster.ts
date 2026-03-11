@@ -1,7 +1,8 @@
 import type { Server } from "socket.io";
 import type { ClubEventBus } from "../event-bus.js";
+import type { SessionEngine } from "../session-engine/engine.js";
 
-export function setupBroadcaster(io: Server, bus: ClubEventBus): void {
+export function setupBroadcaster(io: Server, bus: ClubEventBus, engine: SessionEngine): void {
   const agentNsp = io.of("/agent");
   const audienceNsp = io.of("/audience");
 
@@ -28,5 +29,29 @@ export function setupBroadcaster(io: Server, bus: ClubEventBus): void {
 
   bus.on("queue:update", (data) => {
     audienceNsp.emit("queue:update", data);
+  });
+
+  bus.on("code:error", (data) => {
+    const d = data as { type: string; error: string; agentId: string };
+    agentNsp.to(`agent:${d.agentId}`).emit("code:error", { type: d.type, error: d.error });
+  });
+
+  const lastErrorAt: Record<string, number> = {};
+
+  audienceNsp.on("connection", (socket) => {
+    socket.on("code:error", (data: { type: string; error: string }) => {
+      if (!data?.type || !data?.error) return;
+      const slotType = data.type as "dj" | "vj";
+
+      const now = Date.now();
+      if (lastErrorAt[slotType] && now - lastErrorAt[slotType] < 5000) return;
+      lastErrorAt[slotType] = now;
+
+      const state = engine.getClubState();
+      const slot = slotType === "dj" ? state.dj : state.vj;
+      if (!slot.agent) return;
+
+      bus.emit("code:error", { type: slotType, error: data.error, agentId: slot.agent.id });
+    });
   });
 }

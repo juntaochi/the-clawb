@@ -5,6 +5,7 @@ export interface ServerToAgentEvents {
   "session:warning": (data: { type: SlotType; endsIn: number }) => void;
   "session:end": (data: { type: SlotType }) => void;
   "code:ack": (data: { ok: boolean; error?: string }) => void;
+  "code:error": (data: { type: SlotType; error: string }) => void;
 }
 
 export interface AgentToServerEvents {
@@ -22,4 +23,5 @@ export interface ServerToAudienceEvents {
 
 export interface AudienceToServerEvents {
   "chat:send": (data: { text: string }) => void;
+  "code:error": (data: { type: SlotType; error: string }) => void;
 }

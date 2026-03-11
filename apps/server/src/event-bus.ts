@@ -5,6 +5,7 @@ export type EngineEvent =
   | "session:warning"
   | "session:end"
   | "code:update"
+  | "code:error"
   | "queue:update";
 
 export class ClubEventBus extends EventEmitter {
