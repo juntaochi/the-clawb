@@ -9,7 +9,7 @@ interface ClubState {
   djAgent: string | null;
   vjAgent: string | null;
   audienceCount: number;
-  chatMessages: { from: string; text: string; timestamp: number }[];
+  chatMessages: { from: string; text: string; timestamp: number; role?: "agent" | "audience" | "system" }[];
 }
 
 export function useClubSocket() {

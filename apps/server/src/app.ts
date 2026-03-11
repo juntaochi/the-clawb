@@ -14,8 +14,10 @@ import type { SessionConfig } from "@the-clawb/shared";
 const DEFAULT_SESSION_CONFIG: SessionConfig = {
   durationMs: 15 * 60 * 1000,
   warningMs: 2 * 60 * 1000,
-  minPushIntervalMs: 8000,
+  minPushIntervalMs: 2000,
   maxBpmDelta: 15,
+  codeQueueIntervalMs: 30_000,
+  codeQueueMaxDepth: 5,
 };
 
 export function buildApp(sessionConfig?: SessionConfig) {

@@ -19,7 +19,7 @@ export function sessionRoutes(engine: SessionEngine, authenticateAgent: PreHandl
     });
 
     app.post("/api/v1/sessions/code", { preHandler: authenticateAgent }, async (request, reply) => {
-      const body = request.body as { type?: string; code?: string } | undefined;
+      const body = request.body as { type?: string; code?: string; immediate?: boolean } | undefined;
       if (!body?.type || !body?.code) {
         return reply.status(400).send({ error: "type and code required" });
       }
@@ -31,7 +31,11 @@ export function sessionRoutes(engine: SessionEngine, authenticateAgent: PreHandl
       }
 
       const agent = (request as any).agent;
-      const result = engine.pushCode(agent.id, { type: body.type, code: body.code });
+      const result = engine.pushCode(agent.id, {
+        type: body.type,
+        code: body.code,
+        immediate: body.immediate === true,
+      });
       if (!result.ok) return reply.status(403).send(result);
       return reply.send(result);
     });

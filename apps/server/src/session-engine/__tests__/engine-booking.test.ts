@@ -7,6 +7,8 @@ const testConfig = {
   warningMs: 10_000,
   minPushIntervalMs: 1000,
   maxBpmDelta: 15,
+  codeQueueIntervalMs: 5_000,
+  codeQueueMaxDepth: 5,
 };
 
 describe("SessionEngine booking protections", () => {

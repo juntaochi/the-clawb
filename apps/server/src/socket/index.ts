@@ -19,6 +19,6 @@ export function setupSocketServer(
   const io = new Server(httpServer, { cors: { origin: corsOrigin } });
   setupAgentNamespace(io, engine, agentStore);
   setupAudienceNamespace(io, chatStore);
-  setupBroadcaster(io, bus, engine);
+  setupBroadcaster(io, bus, engine, chatStore);
   return io;
 }

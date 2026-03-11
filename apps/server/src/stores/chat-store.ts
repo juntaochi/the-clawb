@@ -1,4 +1,4 @@
-export type ChatRole = "agent" | "audience";
+export type ChatRole = "agent" | "audience" | "system";
 
 export interface ChatMessage {
   from: string;
@@ -18,6 +18,10 @@ export class ChatStore {
       this.messages = this.messages.slice(-this.maxMessages);
     }
     return msg;
+  }
+
+  addSystem(text: string): ChatMessage {
+    return this.add("[SYSTEM]", text, "system");
   }
 
   recent(limit = 50): ChatMessage[] {

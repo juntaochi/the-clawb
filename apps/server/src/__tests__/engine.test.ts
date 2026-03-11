@@ -8,6 +8,8 @@ const config: SessionConfig = {
   warningMs: 10_000,
   minPushIntervalMs: 1000,
   maxBpmDelta: 15,
+  codeQueueIntervalMs: 5_000,
+  codeQueueMaxDepth: 5,
 };
 
 describe("SessionEngine", () => {
@@ -34,7 +36,7 @@ describe("SessionEngine", () => {
     expect(state.dj.status).toBe("idle");
     expect(state.vj.status).toBe("idle");
     expect(state.dj.code).toContain("note");
-    expect(state.vj.code).toContain("osc");
+    expect(state.vj.code).toContain("shape");
   });
 
   it("books a slot and queues agent", () => {
@@ -107,7 +109,10 @@ describe("SessionEngine", () => {
     engine.bookSlot("agent-1", "DJ One", "dj");
     engine.processQueue();
     vi.advanceTimersByTime(60_000);
-    expect(onEvent).toHaveBeenCalledWith("session:end", { type: "dj" });
+    expect(onEvent).toHaveBeenCalledWith(
+      "session:end",
+      expect.objectContaining({ type: "dj" }),
+    );
     expect(engine.getClubState().dj.status).toBe("idle");
   });
 
@@ -120,5 +125,81 @@ describe("SessionEngine", () => {
     const startCalls = onEvent.mock.calls.filter((call) => call[0] === "session:start");
     const lastStart = startCalls[startCalls.length - 1];
     expect(lastStart[1].code).toBe('note("custom")');
+  });
+
+  // --- Code Queue behavior ---
+
+  it("first push on empty queue goes live immediately", () => {
+    engine.bookSlot("agent-1", "DJ One", "dj");
+    engine.processQueue();
+    const result = engine.pushCode("agent-1", { type: "dj", code: "live-now" });
+    expect(result).toEqual({ ok: true, queued: 0, queueDepth: 0 });
+    expect(engine.getClubState().dj.code).toBe("live-now");
+  });
+
+  it("second push within interval goes to queue", () => {
+    engine.bookSlot("agent-1", "DJ One", "dj");
+    engine.processQueue();
+    engine.pushCode("agent-1", { type: "dj", code: "first" });
+    // Advance past minPushIntervalMs (1s) but not codeQueueIntervalMs (5s)
+    vi.advanceTimersByTime(1500);
+    const result = engine.pushCode("agent-1", { type: "dj", code: "second" });
+    expect(result).toEqual({ ok: true, queued: 1, queueDepth: 1 });
+    // Live code is still "first"
+    expect(engine.getClubState().dj.code).toBe("first");
+  });
+
+  it("queued code drips to live after interval", () => {
+    engine.bookSlot("agent-1", "DJ One", "dj");
+    engine.processQueue();
+    engine.pushCode("agent-1", { type: "dj", code: "first" });
+    vi.advanceTimersByTime(1500);
+    engine.pushCode("agent-1", { type: "dj", code: "second" });
+
+    // Advance past codeQueueIntervalMs (5s) to trigger drip
+    vi.advanceTimersByTime(5_000);
+    expect(engine.getClubState().dj.code).toBe("second");
+    expect(engine.getClubState().dj.codeQueueDepth).toBe(0);
+  });
+
+  it("immediate flag bypasses queue and clears pending", () => {
+    engine.bookSlot("agent-1", "DJ One", "dj");
+    engine.processQueue();
+    engine.pushCode("agent-1", { type: "dj", code: "first" });
+    vi.advanceTimersByTime(1500);
+    engine.pushCode("agent-1", { type: "dj", code: "queued" });
+
+    vi.advanceTimersByTime(1500);
+    const result = engine.pushCode("agent-1", { type: "dj", code: "urgent", immediate: true });
+    expect(result).toEqual({ ok: true, queued: 0, queueDepth: 0 });
+    expect(engine.getClubState().dj.code).toBe("urgent");
+    expect(engine.getClubState().dj.codeQueueDepth).toBe(0);
+  });
+
+  it("session end clears code queue", () => {
+    engine.bookSlot("agent-1", "DJ One", "dj");
+    engine.processQueue();
+    engine.pushCode("agent-1", { type: "dj", code: "first" });
+    vi.advanceTimersByTime(1500);
+    engine.pushCode("agent-1", { type: "dj", code: "queued" });
+    expect(engine.getClubState().dj.codeQueueDepth).toBe(1);
+
+    engine.endSession("dj");
+    // Queue should be cleared — no drip should happen
+    vi.advanceTimersByTime(10_000);
+    expect(engine.getClubState().dj.codeQueueDepth).toBe(0);
+  });
+
+  it("codeQueueDepth appears in getClubState", () => {
+    engine.bookSlot("agent-1", "DJ One", "dj");
+    engine.processQueue();
+    expect(engine.getClubState().dj.codeQueueDepth).toBe(0);
+
+    engine.pushCode("agent-1", { type: "dj", code: "first" });
+    vi.advanceTimersByTime(1500);
+    engine.pushCode("agent-1", { type: "dj", code: "q1" });
+    vi.advanceTimersByTime(1500);
+    engine.pushCode("agent-1", { type: "dj", code: "q2" });
+    expect(engine.getClubState().dj.codeQueueDepth).toBe(2);
   });
 });

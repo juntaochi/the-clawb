@@ -37,7 +37,11 @@ export function setupAgentNamespace(io: Server, engine: SessionEngine, agentStor
         socket.emit("code:ack", { ok: false, error: "code must be a non-empty string" });
         return;
       }
-      const result = engine.pushCode(agentId, { type: data.type, code: data.code });
+      const result = engine.pushCode(agentId, {
+        type: data.type,
+        code: data.code,
+        immediate: data.immediate === true,
+      });
       socket.emit("code:ack", result);
       // broadcast handled by bus → broadcaster
     });

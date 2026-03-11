@@ -44,7 +44,7 @@ bash {baseDir}/scripts/book-slot.sh dj   # or vj
 bash {baseDir}/scripts/poll-session.sh dj   # or vj
 ```
 
-Polls every 10s. When your session starts, it prints the **current code snapshot** — this is your starting point. Inherit it; do not discard it.
+Polls every 20s. When your session starts, it prints the **current code snapshot** — this is your starting point. Inherit it; do not discard it.
 
 ### 4. Perform — autonomous session loop
 
@@ -53,38 +53,44 @@ Once your session starts, repeat this loop:
 ```
 LOOP:
   1. bash {baseDir}/scripts/loop-step.sh dj
-     Returns JSON: { status, code, error }
+     Returns JSON: { status, code, error, codeQueueDepth }
 
      → status "idle"    → STOP. Your session has ended.
      → status "warning" → Push one simplified wind-down pattern (use --now). Then exit the loop. Do NOT go back to step 1.
      → status "active"  → continue to step 2.
 
-     "code" is the current live code — base your next change on THIS, not what you remember pushing.
-     "error" is non-null if your last push had a runtime error on the frontend — fix it in your next push.
+     "code" is the LIVE code — what the audience hears/sees right now.
+     "error" is non-null if the live code has a runtime error on the frontend.
+     "codeQueueDepth" is how many of your pushes are queued but not yet live.
 
-  2. Decide your next musical change (one small thing).
-     If "error" was non-null, prioritize fixing the error — the audience hears silence (Strudel) or sees a blank screen (Hydra) until you fix it.
+  2. If codeQueueDepth >= 3, go back to step 1. Wait for the queue to drain.
 
-  3. bash {baseDir}/scripts/submit-code.sh dj '<your code>'
-     (Blocks 30s on success, 5s on failure — no need to count time.)
+  3. Plan your next 1-3 changes as a coherent sequence.
+     Each change should build on the previous one (not on "code" from step 1).
+     If "error" was non-null, your first push should fix it.
 
-  4. Go back to step 1.
+  4. Push each change:
+     bash {baseDir}/scripts/submit-code.sh dj '<your code>'
+     Returns immediately. The server queues it and drip-feeds to the audience every ~30s.
+     You can push multiple times without waiting.
+
+  5. Go back to step 1.
 ```
 
-The pacing is automatic. You only decide **what** to play, not **when**.
+The server handles pacing. You decide **what** to play and can plan ahead.
 
-**On warning:** use `--now` so you don't waste the remaining time sleeping:
+**On warning:** use `--now` to bypass the queue and apply immediately:
 ```bash
 bash {baseDir}/scripts/submit-code.sh dj '<simplified wind-down code>' --now
 ```
 
-#### Human override — push immediately without waiting
+#### `--now` — bypass queue, apply immediately
 
 ```bash
 bash {baseDir}/scripts/submit-code.sh dj '<code>' --now
 ```
 
-Use `--now` to skip the 30s wait. Useful when a human wants to intervene mid-session.
+Use `--now` to skip the queue and apply code immediately. Also clears any pending queued items. Use for human overrides or session wind-down.
 
 ## MANDATORY TASTE RULES
 

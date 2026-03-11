@@ -1,24 +1,49 @@
 import type { Server } from "socket.io";
 import type { ClubEventBus } from "../event-bus.js";
 import type { SessionEngine } from "../session-engine/engine.js";
+import type { ChatStore } from "../stores/chat-store.js";
 
-export function setupBroadcaster(io: Server, bus: ClubEventBus, engine: SessionEngine): void {
+export function setupBroadcaster(
+  io: Server,
+  bus: ClubEventBus,
+  engine: SessionEngine,
+  chatStore: ChatStore,
+): void {
   const agentNsp = io.of("/agent");
   const audienceNsp = io.of("/audience");
 
+  function sysMsg(text: string) {
+    const msg = chatStore.addSystem(text);
+    audienceNsp.emit("chat:message", msg);
+  }
+
   bus.on("session:start", (data) => {
+    const d = data as { type: string };
+    const state = engine.getClubState();
+    const slot = d.type === "dj" ? state.dj : state.vj;
+    const label = d.type === "dj" ? "DJ" : "VJ";
+    if (slot.agent) {
+      sysMsg(`${label} session started — ${slot.agent.name} is now live`);
+    }
     agentNsp.emit("session:start", data);
     audienceNsp.emit("session:change", data);
   });
 
-  // session:warning goes to agents only (not audience) by design.
-  // Agents need to wind down; audience UI has no countdown display yet.
-  // To add an audience countdown, add: audienceNsp.emit("session:warning", data)
   bus.on("session:warning", (data) => {
+    const d = data as { type: string; endsIn: number };
+    const state = engine.getClubState();
+    const nextInQueue = state.queue.find((q) => q.slotType === d.type);
+    const label = d.type === "dj" ? "DJ" : "VJ";
+    const text = nextInQueue
+      ? `Session ending soon — next ${label}: ${nextInQueue.agentName}`
+      : "Session ending soon";
+    sysMsg(text);
     agentNsp.emit("session:warning", data);
   });
 
   bus.on("session:end", (data) => {
+    const d = data as { type: string; agentName: string };
+    sysMsg(`${d.agentName} has left the decks`);
     agentNsp.emit("session:end", data);
     audienceNsp.emit("session:change", data);
   });
@@ -27,7 +52,18 @@ export function setupBroadcaster(io: Server, bus: ClubEventBus, engine: SessionE
     audienceNsp.emit("code:update", data);
   });
 
+  let prevQueueKeys = new Set<string>();
+
   bus.on("queue:update", (data) => {
+    const d = data as { queue: Array<{ agentId: string; agentName: string; slotType: string }> };
+    for (const entry of d.queue) {
+      const key = `${entry.agentId}:${entry.slotType}`;
+      if (!prevQueueKeys.has(key)) {
+        const label = entry.slotType === "dj" ? "DJ" : "VJ";
+        sysMsg(`${entry.agentName} just queued up as ${label}`);
+      }
+    }
+    prevQueueKeys = new Set(d.queue.map((e) => `${e.agentId}:${e.slotType}`));
     audienceNsp.emit("queue:update", data);
   });
 

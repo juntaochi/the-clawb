@@ -1,10 +1,11 @@
 import { randomUUID } from "crypto";
 import type {
   SlotType, SlotState, SessionStatus, SessionConfig,
-  ClubState, QueuePosition, CodePush,
+  ClubState, QueuePosition, CodePush, CodePushResult,
 } from "@the-clawb/shared";
-import { DEFAULT_DJ_CODE, DEFAULT_VJ_CODE } from "./defaults.js";
+import { DEFAULT_DJ_CODE, DEFAULT_VJ_CODE } from "@the-clawb/shared";
 import { ClubEventBus } from "../event-bus.js";
+import { CodeQueue } from "./code-queue.js";
 
 interface ActiveSession {
   id: string;
@@ -13,7 +14,8 @@ interface ActiveSession {
   type: SlotType;
   startedAt: number;
   endsAt: number;
-  lastPushAt: number;
+  lastPushAt: number;     // last time code went LIVE (drip or immediate)
+  lastSubmitAt: number;   // last time agent called pushCode (for rate limiting)
   lastError: { error: string; at: number } | null;
   warningTimer: ReturnType<typeof setTimeout> | null;
   endTimer: ReturnType<typeof setTimeout> | null;
@@ -27,12 +29,17 @@ export class SessionEngine {
   private queue: QueuePosition[] = [];
   private config: SessionConfig;
   private bus: ClubEventBus;
+  private codeQueue: CodeQueue;
 
   constructor(config: SessionConfig, bus: ClubEventBus) {
     this.config = config;
     this.bus = bus;
     this.djCode = DEFAULT_DJ_CODE;
     this.vjCode = DEFAULT_VJ_CODE;
+    this.codeQueue = new CodeQueue(
+      { maxDepth: config.codeQueueMaxDepth, intervalMs: config.codeQueueIntervalMs },
+      (type, code) => this.applyCode(type, code),
+    );
   }
 
   getClubState(): ClubState {
@@ -89,23 +96,48 @@ export class SessionEngine {
     }
   }
 
-  pushCode(agentId: string, push: CodePush): { ok: boolean; error?: string } {
+  pushCode(agentId: string, push: CodePush): CodePushResult {
     const session = this.getSession(push.type);
     if (!session || session.agentId !== agentId) {
       return { ok: false, error: "Not the active agent for this slot" };
     }
 
     const now = Date.now();
-    if (now - session.lastPushAt < this.config.minPushIntervalMs) {
-      return { ok: false, error: "Too fast — wait between pushes" };
+
+    // Rate-limit submissions (prevents queue spam)
+    if (now - session.lastSubmitAt < this.config.minPushIntervalMs) {
+      return { ok: false, error: "Too fast — wait between submissions" };
+    }
+    session.lastSubmitAt = now;
+
+    // --now / immediate: bypass queue, apply directly
+    if (push.immediate) {
+      this.codeQueue.clear(push.type);
+      this.applyCode(push.type, push.code);
+      return { ok: true, queued: 0, queueDepth: 0 };
     }
 
-    if (push.type === "dj") this.djCode = push.code;
-    else this.vjCode = push.code;
-    session.lastPushAt = now;
-    session.lastError = null; // clear — agent pushed new code
+    // If queue is empty and enough time since last live push, go live immediately
+    if (this.codeQueue.depth(push.type) === 0 &&
+        now - session.lastPushAt >= this.config.codeQueueIntervalMs) {
+      this.applyCode(push.type, push.code);
+      return { ok: true, queued: 0, queueDepth: 0 };
+    }
 
-    this.bus.emit("code:update", { type: push.type, code: push.code, agentName: session.agentName });
+    // Queue the code for drip-feed
+    const result = this.codeQueue.enqueue(push.type, push.code);
+    if ("error" in result) {
+      return { ok: false, error: result.error };
+    }
+    return { ok: true, queued: result.position, queueDepth: result.depth };
+  }
+
+  clearCodeQueue(agentId: string, type: SlotType): { ok: boolean; error?: string } {
+    const session = this.getSession(type);
+    if (!session || session.agentId !== agentId) {
+      return { ok: false, error: "Not the active agent for this slot" };
+    }
+    this.codeQueue.clear(type);
     return { ok: true };
   }
 
@@ -122,11 +154,39 @@ export class SessionEngine {
     if (session.warningTimer) clearTimeout(session.warningTimer);
     if (session.endTimer) clearTimeout(session.endTimer);
 
+    const agentName = session.agentName;
+
     if (type === "dj") this.djSession = null;
     else this.vjSession = null;
 
-    this.bus.emit("session:end", { type });
+    this.codeQueue.clear(type);
+    this.bus.emit("session:end", { type, agentName });
     this.processQueue();
+  }
+
+  destroy(): void {
+    this.codeQueue.destroy();
+    for (const session of [this.djSession, this.vjSession]) {
+      if (session?.warningTimer) clearTimeout(session.warningTimer);
+      if (session?.endTimer) clearTimeout(session.endTimer);
+    }
+  }
+
+  private applyCode(type: SlotType, code: string): void {
+    if (type === "dj") this.djCode = code;
+    else this.vjCode = code;
+
+    const session = this.getSession(type);
+    if (session) {
+      session.lastPushAt = Date.now();
+      session.lastError = null;
+    }
+
+    this.bus.emit("code:update", {
+      type,
+      code,
+      agentName: session?.agentName ?? "unknown",
+    });
   }
 
   private startSession(entry: QueuePosition): void {
@@ -139,6 +199,7 @@ export class SessionEngine {
       startedAt: now,
       endsAt: now + this.config.durationMs,
       lastPushAt: 0,
+      lastSubmitAt: 0,
       lastError: null,
       warningTimer: null,
       endTimer: null,
@@ -179,6 +240,7 @@ export class SessionEngine {
       startedAt: session?.startedAt ?? null,
       endsAt: session?.endsAt ?? null,
       lastError: session?.lastError ?? null,
+      codeQueueDepth: this.codeQueue.depth(type),
     };
   }
 }

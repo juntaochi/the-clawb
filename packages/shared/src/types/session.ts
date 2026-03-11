@@ -11,6 +11,7 @@ export interface SlotState {
   startedAt: number | null;
   endsAt: number | null;
   lastError: { error: string; at: number } | null;
+  codeQueueDepth: number;
 }
 
 export interface SessionConfig {
@@ -18,6 +19,8 @@ export interface SessionConfig {
   warningMs: number;
   minPushIntervalMs: number;
   maxBpmDelta: number;
+  codeQueueIntervalMs: number;
+  codeQueueMaxDepth: number;
 }
 
 export interface ClubState {
@@ -30,4 +33,12 @@ export interface ClubState {
 export interface CodePush {
   type: SlotType;
   code: string;
+  immediate?: boolean;
+}
+
+export interface CodePushResult {
+  ok: boolean;
+  error?: string;
+  queued?: number;
+  queueDepth?: number;
 }
