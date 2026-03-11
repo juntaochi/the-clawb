@@ -11,11 +11,28 @@ const FFT_SIZE = 1024;
  *
  * Call `activate()` after Strudel has initialized its AudioContext.
  */
+// Zero-filled stub so Hydra code using a.fft[] doesn't throw before audio starts
+function initAStub(numBins: number) {
+  const fft = new Float32Array(numBins);
+  (globalThis as Record<string, unknown>)["a"] = {
+    fft,
+    setSmooth: (_v: number) => {},
+    setScale: (_v: number) => {},
+    setCutoff: (_v: number) => {},
+    setBands: (_v: number) => {},
+    setBins: (_v: number) => {},
+    show: () => {},
+    hide: () => {},
+  };
+  return fft;
+}
+
 export function useStrudelAudioBridge() {
   const [bridgeActive, setBridgeActive] = useState(false);
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const activatedRef = useRef(false);
+  const fftRef = useRef<Float32Array>(initAStub(NUM_BINS));
 
   const activate = useCallback(async () => {
     if (activatedRef.current) return;
@@ -54,22 +71,8 @@ export function useStrudelAudioBridge() {
     const dataArray = new Float32Array(bufferLength);
     const binSize = Math.floor(bufferLength / NUM_BINS);
 
-    // Expose window.a with fft array so Hydra code using a.fft[0] works.
-    // detectAudio:false means Hydra doesn't create this object itself.
-    const fft = new Float32Array(NUM_BINS);
-    const aObj = {
-      fft,
-      // Stub methods agents may call — we handle smoothing in the analyser node
-      // Stubs — smoothing/scaling handled by the AnalyserNode itself
-      setSmooth: (_v: number) => {},
-      setScale: (_v: number) => {},
-      setCutoff: (_v: number) => {},
-      setBands: (_v: number) => {},
-      setBins: (_v: number) => {},
-      show: () => {},
-      hide: () => {},
-    };
-    (globalThis as Record<string, unknown>)["a"] = aObj;
+    // Reuse the stub already on window.a — just start filling it with real data
+    const fft = fftRef.current;
 
     function loop() {
       analyser.getFloatFrequencyData(dataArray);
