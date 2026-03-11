@@ -49,10 +49,24 @@ export function useStrudelAudioBridge() {
 
     setAnalyserNode(analyser);
 
-    // Start rAF loop that feeds Hydra's a0–a3 globals
+    // Start rAF loop that feeds Hydra's a0–a3 globals AND a.fft[] array
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Float32Array(bufferLength);
     const binSize = Math.floor(bufferLength / NUM_BINS);
+
+    // Expose window.a with fft array so Hydra code using a.fft[0] works.
+    // detectAudio:false means Hydra doesn't create this object itself.
+    const fft = new Float32Array(NUM_BINS);
+    const aObj = {
+      fft,
+      // Stub methods agents may call — we handle smoothing in the analyser node
+      setSmooth: (_v: number) => {},
+      setScale: (_v: number) => {},
+      setCutoff: (_v: number) => {},
+      setBands: (_v: number) => {},
+      show: () => {},
+    };
+    (globalThis as Record<string, unknown>)["a"] = aObj;
 
     function loop() {
       analyser.getFloatFrequencyData(dataArray);
@@ -64,13 +78,14 @@ export function useStrudelAudioBridge() {
         }
         const avgDb = sum / binSize;
         const normalized = Math.max(0, Math.min(1, (avgDb + 100) / 100));
-        const val = normalized;
 
-        // Hydra expects: a0(scale, offset) => () => value * scale + offset
+        fft[i] = normalized;
+
+        // Also expose a0–a3 for legacy / alternative Hydra patterns
         (globalThis as Record<string, unknown>)[`a${i}`] = (
           scale = 1,
           offset = 0,
-        ) => () => val * scale + offset;
+        ) => () => normalized * scale + offset;
       }
 
       rafRef.current = requestAnimationFrame(loop);

@@ -53,16 +53,11 @@ stack(
     .orbit(3)
 )`;
 
-export const DEFAULT_HYDRA_CODE = `// Audio sensitivity tuning
-a.setSmooth(0.85)
-a.setScale(6)
-a.setCutoff(0.3)
-
-osc(() => 3 + a.fft[0] * 18, 0.03, () => a.fft[2] * Math.PI)
+export const DEFAULT_HYDRA_CODE = `osc(() => 3 + a.fft[0] * 18, 0.03, () => a.fft[2] * Math.PI)
   .color(
-    () => 0.05 + a.fft[0] * 0.55,
-    () => 0.08 + a.fft[1] * 0.15,
-    () => 0.35 + a.fft[2] * 0.50
+    () => 0.3 + a.fft[0] * 0.6,
+    () => 0.1 + a.fft[1] * 0.2,
+    () => 0.6 + a.fft[2] * 0.4
   )
   .modulate(
     noise(() => 1.5 + a.fft[2] * 7),
@@ -72,10 +67,10 @@ osc(() => 3 + a.fft[0] * 18, 0.03, () => a.fft[2] * Math.PI)
     src(o0)
       .scale(() => 1.002 + a.fft[0] * 0.006)
       .rotate(() => a.fft[1] * 0.003)
-      .brightness(-0.014),
-    () => 0.84 - a.fft[0] * 0.20
+      .brightness(-0.012),
+    () => 0.82 - a.fft[0] * 0.20
   )
   .kaleid(6)
-  .saturate(() => 1.1 + a.fft[0] * 2.2)
-  .brightness(() => -0.08 + a.fft[0] * 0.15)
+  .saturate(() => 1.2 + a.fft[0] * 2.0)
+  .brightness(() => 0.05 + a.fft[0] * 0.15)
   .out(o0)`;
