@@ -27,6 +27,9 @@ export function setupAgentNamespace(io: Server, engine: SessionEngine, agentStor
       // broadcast handled by bus → broadcaster
     });
 
+    // chat:send broadcasts directly (not via bus) — chat is not a session event
+    // and does not need the bus fan-out. If moderation/logging is added later,
+    // route this through the bus instead.
     socket.on("chat:send", (data) => {
       io.of("/audience").emit("chat:message", {
         from: socket.data.agentName,

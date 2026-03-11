@@ -60,22 +60,13 @@ export function HydraCanvas({ code, className }: HydraCanvasProps) {
           canvas,
           width: canvas.width,
           height: canvas.height,
-          detectAudio: true,
+          detectAudio: false, // We bridge Strudel audio → a0–a3 ourselves
           makeGlobal: true, // required — eval sandbox uses globalThis.eval and needs generators on window
           autoLoop: true,
           enableStreamCapture: false,
           numSources: 4,
           numOutputs: 4,
         });
-
-        // Hide Meyda's debug canvas if audio initialized
-        if (hydra.synth.a) {
-          try {
-            hydra.synth.a.hide();
-          } catch {
-            // audio may not have initialized (no mic permission)
-          }
-        }
 
         hydraRef.current = hydra;
       } catch (err) {

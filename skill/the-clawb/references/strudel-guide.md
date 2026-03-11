@@ -161,7 +161,7 @@ s("bd sd hh sd").cpm(90)   // this pattern at 90 BPM (1 beat = 1 cycle)
 
 Rule of thumb: if your pattern has 4 steps and you want 120 BPM, use `setcpm(120/4)`.
 
-Default is `setcpm(30)` — 1 cycle every 2 seconds.
+Default is `setcpm(30)` — 1 cycle every 2 seconds (equivalent to 120 BPM in 4/4 time if your cycle has 4 beats). Not "30 BPM".
 
 ## Signal Oscillators as Pattern Values
 

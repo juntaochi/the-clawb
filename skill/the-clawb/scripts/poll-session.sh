@@ -17,8 +17,12 @@ SERVER="${THE_CLAWB_SERVER:-https://server.theclawb.dev}"
 echo "[waiting] Polling for your $SLOT_TYPE session to start (every 10s)..." >&2
 
 while true; do
-  STATUS_RESP=$(curl -sf "$SERVER/api/v1/slots/status" \
-    -H "Authorization: Bearer $API_KEY")
+  if ! STATUS_RESP=$(curl -sf "$SERVER/api/v1/slots/status" \
+    -H "Authorization: Bearer $API_KEY"); then
+    echo "[warning] Could not reach server, retrying in 10s..." >&2
+    sleep 10
+    continue
+  fi
 
   STATUS=$(echo "$STATUS_RESP" | jq -r --arg t "$SLOT_TYPE" '.[$t].status')
   ACTIVE_AGENT_ID=$(echo "$STATUS_RESP" | jq -r --arg t "$SLOT_TYPE" '.[$t].agent.id // ""')
@@ -32,9 +36,13 @@ while true; do
     exit 0
   fi
 
-  QUEUE_POS=$(echo "$STATUS_RESP" | \
-    jq -r --arg id "$MY_AGENT_ID" \
-    '[.queue[] | select(.agentId == $id)] | if length > 0 then "queue position \(.[0].position // "?")" else "not in queue" end')
-  echo "[waiting] $SLOT_TYPE is $STATUS — you are $QUEUE_POS. Checking again in 10s..." >&2
+  # Show queue position (computed from index in slot-filtered queue)
+  QUEUE_INFO=$(echo "$STATUS_RESP" | jq -r \
+    --arg id "$MY_AGENT_ID" --arg t "$SLOT_TYPE" \
+    '[ .queue[] | select(.slotType == $t) ] |
+     to_entries |
+     map(select(.value.agentId == $id)) |
+     if length > 0 then "queue position \(.[0].key + 1)" else "not in queue" end')
+  echo "[waiting] $SLOT_TYPE is $STATUS — you are $QUEUE_INFO. Checking again in 10s..." >&2
   sleep 10
 done

@@ -7,6 +7,8 @@ set -euo pipefail
 #   active   — your session is running, keep performing
 #   warning  — less than 2 minutes left, wind down
 #   idle     — session ended, or a different agent is playing — stop the loop
+#
+# On network error, prints "active" and warns on stderr (safer than stopping).
 
 SLOT_TYPE="${1:-}"
 if [ -z "$SLOT_TYPE" ]; then
@@ -19,8 +21,12 @@ API_KEY=$(jq -r .apiKey "$CRED_FILE")
 MY_AGENT_ID=$(jq -r .agentId "$CRED_FILE")
 SERVER="${THE_CLAWB_SERVER:-https://server.theclawb.dev}"
 
-RESPONSE=$(curl -sf "$SERVER/api/v1/slots/status" \
-  -H "Authorization: Bearer $API_KEY")
+if ! RESPONSE=$(curl -sf "$SERVER/api/v1/slots/status" \
+  -H "Authorization: Bearer $API_KEY"); then
+  echo "[warning] Could not reach server — assuming session still active" >&2
+  echo "active"
+  exit 0
+fi
 
 STATUS=$(echo "$RESPONSE" | jq -r --arg t "$SLOT_TYPE" '.[$t].status')
 ACTIVE_AGENT_ID=$(echo "$RESPONSE" | jq -r --arg t "$SLOT_TYPE" '.[$t].agent.id // ""')

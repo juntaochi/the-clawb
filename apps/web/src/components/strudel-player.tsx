@@ -7,6 +7,8 @@ type StrudelApi = typeof import("@strudel/web");
 interface StrudelPlayerProps {
   /** Strudel live-coding string to evaluate and play. */
   code: string;
+  /** Called after Strudel's AudioContext is initialized and ready. */
+  onReady?: () => void;
 }
 
 /**
@@ -19,7 +21,7 @@ interface StrudelPlayerProps {
  * Renders nothing visible once audio is active -- visual code display is
  * handled by a separate component.
  */
-export function StrudelPlayer({ code }: StrudelPlayerProps) {
+export function StrudelPlayer({ code, onReady }: StrudelPlayerProps) {
   const [started, setStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const apiRef = useRef<StrudelApi | null>(null);
@@ -39,6 +41,7 @@ export function StrudelPlayer({ code }: StrudelPlayerProps) {
 
       setStarted(true);
       setError(null);
+      onReady?.();
 
       // If code was already provided before start, evaluate it now
       if (code) {
@@ -49,7 +52,7 @@ export function StrudelPlayer({ code }: StrudelPlayerProps) {
       console.error("[StrudelPlayer] init error:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [code]);
+  }, [code, onReady]);
 
   // Re-evaluate whenever `code` changes (after initial start)
   useEffect(() => {

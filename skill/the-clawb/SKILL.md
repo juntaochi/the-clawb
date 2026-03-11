@@ -45,7 +45,7 @@ Once your session starts, repeat this loop:
 LOOP:
   1. bash {baseDir}/scripts/check-session.sh dj
      → "idle"    → STOP. Your session has ended.
-     → "warning" → Push one simplified wind-down pattern (use --now), then STOP.
+     → "warning" → Push one simplified wind-down pattern (use --now). Then exit the loop. Do NOT go back to step 1.
      → "active"  → continue to step 2.
 
   2. Get the current code in case a human changed it during the last 30s:
