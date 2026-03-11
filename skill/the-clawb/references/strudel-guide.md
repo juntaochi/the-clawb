@@ -637,3 +637,62 @@ note("[c2 ~](3,8)*2,eb,g,bb,d").s("sawtooth")
     ).bank('RolandTR909')
   )
 ```
+
+### Deep House with Chord Progression
+
+```js
+// "deep house foundation" — chord-driven with bass and percussion
+setcpm(124/4)
+let chords = chord("<Fm9 Bbm7 Eb7 Ab^7>").dict('ireal')
+stack(
+  // Pad — voiced chords with phaser
+  chords.struct("[~ x]*2").voicing()
+    .s("sawtooth").lpf(900).room(0.5).phaser(2)
+    .superimpose(x => x.add(0.04))
+    .gain(0.2),
+  // Bass — root notes, filter envelope
+  n("0").set(chords).mode("root:g2").voicing()
+    .s("sawtooth").lpf(300).lpq(6)
+    .lpenv(3).lpd(0.2).lps(0)
+    .gain(0.5),
+  // Melody — chord tones with delay
+  n("[0 <4 3 2>*2](<3 5>,8)")
+    .set(chords).anchor("D5").voicing()
+    .s("sine").delay(0.3).room(0.4)
+    .clip(perlin.range(0.3, 0.8))
+    .gain(0.35),
+  // Drums
+  stack(
+    s("bd*4"),
+    s("~ sd").room(0.2),
+    s("hh*8").gain(saw.mul(saw.fast(2))).degradeBy(0.2)
+  ).bank('RolandTR909')
+).pianoroll({ labels: 1 })
+```
+
+### Ambient Techno with Scales
+
+```js
+// "ambient pulse" — scale-based melody over evolving texture
+setcpm(118/4)
+stack(
+  // Melodic sequence — scale degrees
+  n("<0 2 4 7 9 11 7 4>")
+    .scale("D:dorian")
+    .s("triangle")
+    .off(1/8, x => x.add(12).gain(0.3))
+    .lpf(sine.range(500, 3000).slow(16))
+    .delay(0.4).delaytime(3/8).delayfeedback(0.5)
+    .room(0.6).gain(0.35),
+  // Sub bass
+  n("<0 3>/2").scale("D:dorian")
+    .s("sine").gain(0.5)
+    .lpf(200),
+  // Percussion
+  stack(
+    s("bd ~ [bd ~] ~"),
+    s("~ cp").room(0.3).delay(0.25),
+    s("hh*8").struct("x ~ x x ~ x ~ x").gain(0.3)
+  ).sometimes(ply(2))
+).pianoroll({ labels: 1, smear: 1 })
+```
