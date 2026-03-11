@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SandboxBridge } from "../lib/sandbox-bridge";
 
 interface StrudelPlayerProps {
@@ -37,7 +37,6 @@ export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps
   const bridgeRef = useRef<SandboxBridge | null>(null);
   const readyRef = useRef<Promise<void> | null>(null);
   const lastCodeRef = useRef<string>("");
-  const startingRef = useRef(false);
 
   // Use refs for callbacks to avoid stale closures in the bridge handlers
   const onAudioDataRef = useRef(onAudioData);
@@ -47,59 +46,49 @@ export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps
   const codeRef = useRef(code);
   codeRef.current = code;
 
-  const start = useCallback(async () => {
-    if (startingRef.current) return;
-    startingRef.current = true;
-
+  // Set up bridge on mount — the iframe's own click handler triggers init
+  useEffect(() => {
     const iframe = iframeRef.current;
-    if (!iframe) {
-      startingRef.current = false;
-      return;
-    }
+    if (!iframe || bridgeRef.current) return;
 
-    try {
-      // Create bridge if not already created
-      if (!bridgeRef.current) {
-        const bridge = new SandboxBridge(iframe);
-        bridgeRef.current = bridge;
+    const bridge = new SandboxBridge(iframe);
+    bridgeRef.current = bridge;
 
-        // Listen for errors from the sandbox
-        bridge.on("error", (data) => {
-          const msg = typeof data.message === "string" ? data.message : String(data.message);
-          console.warn("[StrudelPlayer] sandbox error:", msg);
-          setError(msg);
-        });
+    // Listen for errors from the sandbox
+    bridge.on("error", (data) => {
+      const msg = typeof data.message === "string" ? data.message : String(data.message);
+      console.warn("[StrudelPlayer] sandbox error:", msg);
+      setError(msg);
+    });
 
-        // Listen for audio analysis data from the sandbox
-        bridge.on("audio", (data) => {
-          onAudioDataRef.current?.(data as { fft: number[]; scope: number[]; freq: number[] });
-        });
-      }
+    // Listen for audio analysis data from the sandbox
+    bridge.on("audio", (data) => {
+      onAudioDataRef.current?.(data as { fft: number[]; scope: number[]; freq: number[] });
+    });
 
-      const bridge = bridgeRef.current;
-
-      // Tell the sandbox to initialize Strudel (needs user gesture context)
-      bridge.send("init");
-
-      // Wait for the sandbox to report ready
-      readyRef.current = bridge.waitReady();
-      await readyRef.current;
-
-      // Evaluate initial code if provided
+    // When the sandbox reports ready (after user clicks inside the iframe),
+    // evaluate initial code and mark as started
+    readyRef.current = bridge.waitReady();
+    readyRef.current.then(() => {
       const currentCode = codeRef.current;
       if (currentCode) {
         lastCodeRef.current = currentCode;
         bridge.send("eval", { code: currentCode });
       }
-
       setStarted(true);
       setError(null);
       onReadyRef.current?.();
-    } catch (err) {
+    }).catch((err) => {
       console.error("[StrudelPlayer] init error:", err);
       setError(err instanceof Error ? err.message : String(err));
-      startingRef.current = false; // allow retry on next interaction
-    }
+    });
+
+    return () => {
+      bridge.send("hush");
+      bridge.destroy();
+      bridgeRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Re-evaluate whenever `code` changes (after initial start)
@@ -111,46 +100,36 @@ export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps
     bridgeRef.current.send("eval", { code });
   }, [code, started]);
 
-  // Start audio on first user interaction (required by browser autoplay policy)
-  useEffect(() => {
-    if (started) return;
-    const handler = (e: Event) => {
-      // Ignore modifier keys — they don't count as user intent to start audio
-      if (e instanceof KeyboardEvent) {
-        if (["Meta", "Shift", "Alt", "Control"].includes(e.key)) return;
-      }
-      start();
-    };
-    const events = ["click", "keydown", "touchstart"] as const;
-    events.forEach((ev) => document.addEventListener(ev, handler));
-    return () => {
-      events.forEach((ev) => document.removeEventListener(ev, handler as EventListener));
-    };
-  }, [started, start]);
-
-  // Cleanup: silence on unmount
-  useEffect(() => {
-    return () => {
-      bridgeRef.current?.send("hush");
-      bridgeRef.current?.destroy();
-      bridgeRef.current = null;
-    };
-  }, []);
+  // Note: No parent-side click handler needed — the iframe captures
+  // the user gesture directly (required for AudioContext to unlock).
+  // Cleanup is handled in the bridge setup effect above.
 
   return (
     <>
-      {/* Hidden iframe running the Strudel audio engine in a sandbox */}
+      {/* Sandboxed iframe running the Strudel audio engine.
+          Before init: full-screen + transparent so user click goes to the iframe
+          (AudioContext requires a user gesture in its own browsing context).
+          After init: hidden off-screen since audio plays without visuals. */}
       <iframe
         ref={iframeRef}
         sandbox="allow-scripts"
         src="/sandbox/strudel-sandbox.html"
-        style={{
+        style={started ? {
           width: 0,
           height: 0,
           border: "none",
           position: "fixed",
           top: -9999,
           left: -9999,
+        } : {
+          position: "fixed",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          border: "none",
+          zIndex: 60,
+          opacity: 0,
+          cursor: "pointer",
         }}
         title="Strudel audio sandbox"
       />

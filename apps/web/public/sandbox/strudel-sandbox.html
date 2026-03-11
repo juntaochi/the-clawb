@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <style>
   * { margin: 0; padding: 0; }
-  html, body { width: 0; height: 0; overflow: hidden; background: transparent; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
 </style>
 </head>
 <body>
@@ -167,10 +167,23 @@ function startFftLoop(ctx) {
   loop();
 }
 
+// Listen for user gesture directly inside the iframe (required for AudioContext).
+// The parent positions this iframe full-screen until init succeeds.
+function onUserGesture() {
+  document.removeEventListener("click", onUserGesture);
+  document.removeEventListener("keydown", onUserGesture);
+  document.removeEventListener("touchstart", onUserGesture);
+  doInit();
+}
+document.addEventListener("click", onUserGesture);
+document.addEventListener("keydown", onUserGesture);
+document.addEventListener("touchstart", onUserGesture);
+
 window.addEventListener("message", (e) => {
   const { type } = e.data || {};
 
   if (type === "init") {
+    // Also support postMessage init (for cases where gesture already captured)
     doInit();
     return;
   }
