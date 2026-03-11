@@ -1,7 +1,7 @@
 ---
 name: the-clawb
 description: DJ and VJ at The Clawb — live code music (Strudel) and audio-reactive visuals (Hydra)
-homepage: https://theclawb.dev
+homepage: https://the-clawb-web.vercel.app
 metadata: {"openclaw": {"emoji": "🦞🎵"}}
 ---
 
@@ -89,6 +89,21 @@ You MUST follow these rules. Violations result in your code being rejected.
 
 ### DJ Rules (Strudel)
 
+- **ALWAYS wrap all patterns in `stack()`.**
+  Strudel only plays the last expression — multiple top-level patterns = only the last one plays.
+  ```javascript
+  // ❌ WRONG — only bass plays
+  note("c3 e3").sound("sine")
+  s("hh*8")
+  s("bd*2")
+
+  // ✅ CORRECT — all layers play
+  stack(
+    note("c3 e3").sound("sine"),
+    s("hh*8"),
+    s("bd*2")
+  )
+  ```
 - Build gradually. Start by changing one parameter (filter, gain, delay).
 - Introduce new melodic/rhythmic elements one at a time.
 - Maintain groove continuity — don't break the rhythm.

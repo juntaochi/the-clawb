@@ -7,13 +7,8 @@ interface StrudelScopeProps {
   className?: string;
 }
 
-const WAVEFORM_COLOR = "#00ff88";
-const BG_COLOR = "rgba(0, 0, 0, 0.85)";
+const PEAK_DECAY = 0.994; // how slowly peaks fall
 
-/**
- * Renders a waveform (top) + frequency spectrum (bottom) visualization
- * from a Web Audio AnalyserNode. Designed for the DJ panel.
- */
 export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -27,63 +22,104 @@ export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
 
     const timeData = new Float32Array(analyserNode.fftSize);
     const freqData = new Float32Array(analyserNode.frequencyBinCount);
+    const BAR_COUNT = 80;
+    const peaks = new Float32Array(BAR_COUNT);
 
     function draw() {
       const w = canvas!.width;
       const h = canvas!.height;
-      const halfH = h / 2;
-
-      // Clear
-      ctx!.fillStyle = BG_COLOR;
-      ctx!.fillRect(0, 0, w, h);
+      const scopeH = Math.round(h * 0.35); // top 35% — waveform
+      const specH = h - scopeH;             // bottom 65% — spectrum
 
       analyserNode!.getFloatTimeDomainData(timeData);
       analyserNode!.getFloatFrequencyData(freqData);
 
-      // --- Waveform (top half) ---
-      ctx!.strokeStyle = WAVEFORM_COLOR;
-      ctx!.lineWidth = 1.5;
-      ctx!.beginPath();
+      // --- Background ---
+      ctx!.fillStyle = "rgba(0,0,0,0.92)";
+      ctx!.fillRect(0, 0, w, h);
 
-      const sliceWidth = w / timeData.length;
-      let x = 0;
+      // --- Subtle grid lines (spectrum area) ---
+      ctx!.strokeStyle = "rgba(255,255,255,0.04)";
+      ctx!.lineWidth = 1;
+      for (let row = 0; row <= 4; row++) {
+        const y = scopeH + (specH / 4) * row;
+        ctx!.beginPath();
+        ctx!.moveTo(0, y);
+        ctx!.lineTo(w, y);
+        ctx!.stroke();
+      }
+
+      // --- Waveform ---
+      const sliceW = w / timeData.length;
+
+      // Glow pass
+      ctx!.save();
+      ctx!.globalAlpha = 0.25;
+      ctx!.strokeStyle = "#00ff88";
+      ctx!.lineWidth = 4;
+      ctx!.shadowColor = "#00ff88";
+      ctx!.shadowBlur = 8;
+      ctx!.beginPath();
       for (let i = 0; i < timeData.length; i++) {
         const v = timeData[i]!;
-        const y = halfH / 2 + v * halfH * 0.4;
-        if (i === 0) ctx!.moveTo(x, y);
-        else ctx!.lineTo(x, y);
-        x += sliceWidth;
+        const y = scopeH * 0.5 + v * scopeH * 0.42;
+        if (i === 0) ctx!.moveTo(0, y);
+        else ctx!.lineTo(i * sliceW, y);
+      }
+      ctx!.stroke();
+      ctx!.restore();
+
+      // Crisp pass
+      ctx!.strokeStyle = "#00ff88";
+      ctx!.lineWidth = 1.5;
+      ctx!.beginPath();
+      for (let i = 0; i < timeData.length; i++) {
+        const v = timeData[i]!;
+        const y = scopeH * 0.5 + v * scopeH * 0.42;
+        if (i === 0) ctx!.moveTo(0, y);
+        else ctx!.lineTo(i * sliceW, y);
       }
       ctx!.stroke();
 
-      // --- Spectrum (bottom half) ---
-      const barCount = Math.min(freqData.length, 128);
-      const barWidth = w / barCount;
-
-      for (let i = 0; i < barCount; i++) {
-        // Normalize dB: -100 → 0, 0 → 1
-        const db = freqData[i]!;
-        const normalized = Math.max(0, (db + 100) / 100);
-        const barHeight = normalized * halfH * 0.9;
-
-        // Gradient from cyan to green based on frequency
-        const hue = 140 + (i / barCount) * 40; // 140 (cyan-ish) to 180 (green)
-        ctx!.fillStyle = `hsla(${hue}, 100%, 50%, 0.7)`;
-        ctx!.fillRect(
-          i * barWidth,
-          h - barHeight,
-          barWidth - 1,
-          barHeight,
-        );
-      }
-
-      // Divider line
-      ctx!.strokeStyle = "rgba(255, 255, 255, 0.15)";
+      // Divider
+      ctx!.strokeStyle = "rgba(255,255,255,0.10)";
       ctx!.lineWidth = 1;
       ctx!.beginPath();
-      ctx!.moveTo(0, halfH);
-      ctx!.lineTo(w, halfH);
+      ctx!.moveTo(0, scopeH);
+      ctx!.lineTo(w, scopeH);
       ctx!.stroke();
+
+      // --- Spectrum bars ---
+      const binCount = freqData.length;
+      const barW = w / BAR_COUNT;
+
+      for (let i = 0; i < BAR_COUNT; i++) {
+        // Map bar index to logarithmic frequency bin
+        const binIndex = Math.floor(
+          Math.pow(i / BAR_COUNT, 1.8) * binCount
+        );
+        const db = freqData[Math.min(binIndex, binCount - 1)]!;
+        const normalized = Math.max(0, (db + 100) / 100);
+        const barH = normalized * specH * 0.92;
+
+        // Color: low freq = violet, mid = cyan, high = white-blue
+        const hue = 260 - (i / BAR_COUNT) * 120; // 260 (violet) → 140 (cyan)
+        const lightness = 45 + normalized * 20;
+
+        ctx!.fillStyle = `hsl(${hue}, 100%, ${lightness}%)`;
+        ctx!.fillRect(
+          i * barW,
+          scopeH + specH - barH,
+          Math.max(barW - 1, 1),
+          barH
+        );
+
+        // Peak hold
+        peaks[i] = Math.max(peaks[i]! * PEAK_DECAY, normalized);
+        const peakY = scopeH + specH - peaks[i]! * specH * 0.92;
+        ctx!.fillStyle = `hsla(${hue}, 100%, 85%, 0.7)`;
+        ctx!.fillRect(i * barW, peakY, Math.max(barW - 1, 1), 2);
+      }
 
       rafRef.current = requestAnimationFrame(draw);
     }
@@ -98,7 +134,6 @@ export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
     };
   }, [analyserNode]);
 
-  // Resize canvas to match container
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -127,11 +162,7 @@ export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
         ref={canvasRef}
         width={400}
         height={120}
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "block",
-        }}
+        style={{ width: "100%", height: "100%", display: "block" }}
       />
     </div>
   );

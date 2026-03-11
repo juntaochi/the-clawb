@@ -1,5 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
+import { highlightStrudel } from "../lib/highlight-strudel";
+
 interface CodePanelProps {
   code: string;
   label: string;
@@ -7,6 +10,8 @@ interface CodePanelProps {
 }
 
 export function CodePanel({ code, label, overlay }: CodePanelProps) {
+  const highlighted = useMemo(() => highlightStrudel(code), [code]);
+
   return (
     <div
       className={`font-mono text-sm ${overlay ? "absolute inset-0 pointer-events-none z-10" : "h-full flex flex-col"}`}
@@ -15,10 +20,9 @@ export function CodePanel({ code, label, overlay }: CodePanelProps) {
         {label}
       </div>
       <pre
-        className={`flex-1 p-3 overflow-auto whitespace-pre-wrap ${overlay ? "text-white/60 bg-transparent" : "text-green-400 bg-black/95"}`}
-      >
-        <code>{code}</code>
-      </pre>
+        className={`flex-1 p-3 overflow-auto whitespace-pre-wrap leading-relaxed ${overlay ? "bg-transparent opacity-70" : "bg-black/95"}`}
+        dangerouslySetInnerHTML={{ __html: highlighted }}
+      />
     </div>
   );
 }
