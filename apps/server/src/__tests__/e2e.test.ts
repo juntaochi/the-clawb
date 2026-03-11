@@ -137,6 +137,37 @@ describe("e2e: agent registers, books slot, pushes code", () => {
     expect(chat.json().messages[0].text).toBe("hello rave!");
   });
 
+  it("rejects code push with invalid type", async () => {
+    const { app } = buildApp();
+
+    const reg = await app.inject({
+      method: "POST", url: "/api/v1/agents/register", payload: { name: "type-test" },
+    });
+    const { apiKey } = reg.json();
+    const auth = { authorization: `Bearer ${apiKey}` };
+
+    await app.inject({
+      method: "POST", url: "/api/v1/slots/book",
+      headers: auth, payload: { type: "dj" },
+    });
+
+    // Invalid type: __proto__
+    const push = await app.inject({
+      method: "POST", url: "/api/v1/sessions/code",
+      headers: auth, payload: { type: "__proto__", code: "exploit()" },
+    });
+    expect(push.statusCode).toBe(400);
+    expect(push.json().error).toBe("type must be 'dj' or 'vj'");
+
+    // Whitespace-only code
+    const push2 = await app.inject({
+      method: "POST", url: "/api/v1/sessions/code",
+      headers: auth, payload: { type: "dj", code: "   " },
+    });
+    expect(push2.statusCode).toBe(400);
+    expect(push2.json().error).toBe("code must be a non-empty string");
+  });
+
   it("REST code push emits code:update on bus", async () => {
     const { app, bus } = buildApp();
 
