@@ -55,8 +55,17 @@ export function StrudelPlayer({ code, onReady }: StrudelPlayerProps) {
         // Hydra utilities (NOT "a" — the audio bridge manages window.a separately)
         "render", "hush", "setResolution", "time", "mouse",
       ];
+      // Save Hydra globals, then shield them with defineProperty so
+      // initStrudel's Object.assign(globalThis, ...) can't overwrite them
+      // even for a single frame (prevents feedback-loop white screen).
+      const strudelWrites: Record<string, unknown> = {};
       for (const k of keysToProtect) {
         if (k in globalThis) hydraGlobals[k] = (globalThis as Record<string, unknown>)[k];
+        Object.defineProperty(globalThis, k, {
+          get() { return hydraGlobals[k]; },
+          set(v) { strudelWrites[k] = v; },
+          configurable: true,
+        });
       }
 
       // readyRef gates the useEffect — it must not resolve until samples are loaded
@@ -64,6 +73,11 @@ export function StrudelPlayer({ code, onReady }: StrudelPlayerProps) {
       readyRef.current = new Promise<void>((r) => { resolveReady = r; });
 
       await strudel.initStrudel();
+
+      // Remove shields — restore normal properties
+      for (const k of keysToProtect) {
+        delete (globalThis as Record<string, unknown>)[k];
+      }
 
       // Ensure AudioContext is running (may be suspended without user gesture)
       const getAudioContext = (strudel as Record<string, unknown>)["getAudioContext"] as
@@ -74,20 +88,16 @@ export function StrudelPlayer({ code, onReady }: StrudelPlayerProps) {
         if (ctx.state === "suspended") await ctx.resume();
       }
 
-      // Restore Hydra's globals that Strudel may have overwritten.
-      // "speed" and "bpm" are special: Strudel needs them as functions (pattern
-      // constructors) while Hydra reads them as numbers every frame via
-      // sandbox.tick().  We create hybrid function objects with valueOf() so
-      // that `speed("1.05")` works (Strudel) AND `dt * speed` coerces to a
-      // number (Hydra).
+      // Restore Hydra's globals, creating hybrids for dual-use keys.
+      // "speed" and "bpm": Strudel needs them as functions, Hydra reads
+      // them as numbers every frame. Hybrid: callable + valueOf().
       const dualUseKeys = new Set(["speed", "bpm"]);
       for (const k of keysToProtect) {
         if (!(k in hydraGlobals)) continue;
         if (dualUseKeys.has(k)) {
-          const strudelFn = (globalThis as Record<string, unknown>)[k];
+          const strudelFn = strudelWrites[k];
           const hydraVal = hydraGlobals[k];
           if (typeof strudelFn === "function" && typeof hydraVal === "number") {
-            // Wrap: callable for Strudel, coerces to number for Hydra
             const hybrid = function (this: unknown, ...args: unknown[]) {
               return (strudelFn as Function).apply(this, args);
             };
@@ -154,11 +164,17 @@ export function StrudelPlayer({ code, onReady }: StrudelPlayerProps) {
   // Start audio on first user interaction (required by browser autoplay policy)
   useEffect(() => {
     if (started) return;
-    const handler = () => { start(); };
+    const handler = (e: Event) => {
+      // Ignore modifier keys — they don't count as user intent to start audio
+      if (e instanceof KeyboardEvent) {
+        if (["Meta", "Shift", "Alt", "Control"].includes(e.key)) return;
+      }
+      start();
+    };
     const events = ["click", "keydown", "touchstart"] as const;
     events.forEach((e) => document.addEventListener(e, handler));
     return () => {
-      events.forEach((e) => document.removeEventListener(e, handler));
+      events.forEach((e) => document.removeEventListener(e, handler as EventListener));
     };
   }, [started, start]);
 
@@ -186,7 +202,10 @@ export function StrudelPlayer({ code, onReady }: StrudelPlayerProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center cursor-pointer bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 cursor-pointer bg-black/60 backdrop-blur-sm">
+      <span className="text-white/50 text-sm font-mono">
+        Hi there, human. Welcome to The Clawb.
+      </span>
       <span className="code-line text-white/70 text-sm font-mono tracking-widest">
         click anywhere to start
       </span>
