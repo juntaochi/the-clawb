@@ -2,10 +2,12 @@ import type { Server } from "socket.io";
 import { hashApiKey } from "../auth.js";
 import type { SessionEngine } from "../session-engine/engine.js";
 import type { AgentStore } from "../stores/agent-store.js";
+import { PerKeyRateLimiter } from "../rate-limit.js";
 import { isValidSlotType, isNonEmptyString, sanitizeChatText } from "../validation.js";
 
 export function setupAgentNamespace(io: Server, engine: SessionEngine, agentStore: AgentStore): void {
   const agentNsp = io.of("/agent");
+  const chatLimiter = new PerKeyRateLimiter(1000);
 
   agentNsp.use((socket, next) => {
     const token = socket.handshake.auth?.token as string;
@@ -44,6 +46,7 @@ export function setupAgentNamespace(io: Server, engine: SessionEngine, agentStor
     // and does not need the bus fan-out. If moderation/logging is added later,
     // route this through the bus instead.
     socket.on("chat:send", (data) => {
+      if (!chatLimiter.allow(agentId)) return;
       if (data == null || typeof data !== "object") return;
       const text = sanitizeChatText(data.text);
       if (text === null) return;
