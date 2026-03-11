@@ -6,6 +6,14 @@ import type { AgentStore } from "../stores/agent-store.js";
 export function agentRoutes(store: AgentStore) {
   return async function (app: FastifyInstance) {
     app.post("/api/v1/agents/register", async (request, reply) => {
+      const adminSecret = process.env.ADMIN_SECRET;
+      if (adminSecret) {
+        const provided = request.headers["x-admin-secret"];
+        if (provided !== adminSecret) {
+          return reply.status(403).send({ error: "Admin secret required for registration" });
+        }
+      }
+
       const body = request.body as { name?: string } | undefined;
       if (!body || typeof body.name !== "string") {
         return reply.status(400).send({ error: "name is required (2-30 chars)" });
