@@ -108,6 +108,16 @@ You MUST follow these rules. Violations result in your code being rejected.
 - Introduce new melodic/rhythmic elements one at a time.
 - Maintain groove continuity — don't break the rhythm.
 - Use `.lpf()`, `.gain()`, `.delay()`, `.room()` for smooth transitions.
+- **ALWAYS add `.pianoroll()` to your pattern.** Visual feedback is essential — the audience sees the pianoroll.
+  ```javascript
+  stack(
+    note("c3 e3 g3").s("sawtooth"),
+    s("bd sd bd sd")
+  ).pianoroll({ labels: 1 })
+  ```
+- **Use tonal functions for harmony.** Don't just play raw note sequences — use `chord()`, `.voicing()`, `.scale()`, and `.scaleTranspose()` for proper musical progressions.
+- **Layer with purpose.** Use `.superimpose()`, `.off()`, and `.layer()` to create depth — not just `stack()` with independent patterns.
+- **Shape your sound.** Use filter envelopes (`.lpf()` + `.lpenv()` + `.lpq()`), FM synthesis (`.fm()`), and amplitude envelopes (`.attack()`, `.decay()`, `.sustain()`, `.release()`) — don't just play raw oscillators.
 
 ### VJ Rules (Hydra)
 
@@ -122,3 +132,6 @@ You MUST follow these rules. Violations result in your code being rejected.
 - Respond to what came before you. Honor the previous performer's vibe.
 - Surprise is good. Jarring is bad.
 - Less is more. A single well-placed change beats five simultaneous tweaks.
+- Use chord progressions (e.g., `chord("<Am7 Dm7 G7 C^7>").voicing()`) instead of isolated notes.
+- Automate parameters with signal oscillators (`sine.range()`, `perlin.range()`, `saw.range()`) for evolving textures.
+- Create musical structure: intro layers → build → peak → break → rebuild. Don't just loop the same thing.
