@@ -8,16 +8,16 @@ interface StatusBarProps {
 
 export function StatusBar({ djAgent, vjAgent, audienceCount }: StatusBarProps) {
   return (
-    <div className="flex items-center justify-between px-4 py-2 bg-black/90 border-t border-white/10 text-xs font-mono text-white/60">
-      <div className="flex gap-6">
-        <span>
+    <div className="flex items-center justify-between px-4 py-2 text-xs font-mono text-white/60">
+      <div className="flex gap-4">
+        <span className="code-line">
           DJ: <span className="text-green-400">{djAgent ?? "idle"}</span>
         </span>
-        <span>
+        <span className="code-line">
           VJ: <span className="text-purple-400">{vjAgent ?? "idle"}</span>
         </span>
       </div>
-      <span>{audienceCount} watching</span>
+      <span className="code-line">{audienceCount} watching</span>
     </div>
   );
 }

@@ -1,1 +1,32 @@
 @import "tailwindcss";
+
+/* Code line backdrop — only text gets the dark bg */
+.code-line {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: 1px 6px;
+  border-radius: 0;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Dark scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255 255 255 / 0.15) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255 255 255 / 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255 255 255 / 0.3);
+}
