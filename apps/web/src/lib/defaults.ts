@@ -53,23 +53,31 @@ stack(
     .orbit(3)
 )`;
 
+// Bin layout (FFT 1024, 5 bins, 44100 Hz sample rate):
+//   fft[0] = 0–4343 Hz   → kick, sub bass
+//   fft[1] = 4386–8729 Hz → hat body
+//   fft[2] = 8772–13115 Hz → hat air / upper mids
+//   fft[3] = 13158–17501 Hz → brilliance
+//   fft[4] = 17544–21887 Hz → (nearly inaudible – avoid)
+//
+// Color balance: shapes sum to (0.90, 0.28, 0.90) → pure violet, no channel > 1.
 export const DEFAULT_HYDRA_CODE = `a.setBins(5)
 a.setSmooth(0.75)
 a.setScale(5)
 a.setCutoff(0.3)
 a.hide()
 
-shape([4, 5, 6].fast(0.1).smooth(1), 0.000001, [0.2, 0.7].smooth(1))
-  .color(0.2, 0.4, 0.3)
-  .scrollX(() => Math.sin(time * 0.27) + a.fft[0] * 0.5)
-  .add(shape([4, 5, 6].fast(0.1).smooth(1), 0.000001, [0.2, 0.7, 0.5, 0.3].smooth(1))
-    .color(0.6, 0.2, 0.5)
-    .scrollY(0.35 + a.fft[4] * 0.5)
-    .scrollX(() => Math.sin(time * 0.33) + a.fft[4] * 0.5))
-  .add(shape([4, 5, 6].fast(0.1).smooth(1), 0.000001, [0.2, 0.7, 0.3].smooth(1))
-    .color(0.2, 0.4, 0.6)
-    .scrollY(-0.35 - a.fft[0] * 0.5)
-    .scrollX(() => Math.sin(time * 0.41) * -1 + a.fft[0] * 0.5))
+shape([4, 5, 6].fast(0.1).smooth(1), 0.000001, [0.2, 0.6].smooth(1))
+  .color(0.3, 0.1, 0.3)
+  .scrollX(() => Math.sin(time * 0.27) + a.fft[0] * 0.4)
+  .add(shape([4, 5, 6].fast(0.1).smooth(1), 0.000001, [0.2, 0.6, 0.4, 0.3].smooth(1))
+    .color(0.5, 0.2, 0.5)
+    .scrollY(0.30 + a.fft[2] * 0.4)
+    .scrollX(() => Math.sin(time * 0.33) + a.fft[2] * 0.4), 0.6)
+  .add(shape([4, 5, 6].fast(0.1).smooth(1), 0.000001, [0.2, 0.6, 0.3].smooth(1))
+    .color(0.5, 0.1, 0.5)
+    .scrollY(-0.30 - a.fft[0] * 0.4)
+    .scrollX(() => Math.sin(time * 0.41) * -1 + a.fft[0] * 0.4), 0.6)
   .blend(src(o0)
     .shift(0.001, 0.001, 0.001)
     .scrollX([0.05, -0.05].fast(0.1).smooth(1))

@@ -41,7 +41,9 @@ export function useStrudelAudioBridge() {
     // Dynamic import — types may not include these exports, but they exist at runtime
     const strudel = await import("@strudel/web");
     const getAudioContext = (strudel as Record<string, unknown>)["getAudioContext"] as () => AudioContext;
-    const getController = (strudel as Record<string, unknown>)["getSuperdoughAudioController"] as () => { destinationGain?: GainNode } | undefined;
+    const getController = (strudel as Record<string, unknown>)["getSuperdoughAudioController"] as
+      | (() => { output?: { destinationGain?: GainNode } })
+      | undefined;
 
     if (!getAudioContext || !getController) {
       console.warn("[AudioBridge] required Strudel exports not found");
@@ -54,10 +56,11 @@ export function useStrudelAudioBridge() {
     analyser.fftSize = FFT_SIZE;
     analyser.smoothingTimeConstant = 0.8;
 
-    // Tap into superdough's destinationGain — all Strudel audio flows through it
+    // Tap into superdough's destinationGain — all Strudel audio flows through it.
+    // SuperdoughAudioController.output is a SuperdoughOutput, and destinationGain lives on that.
     const controller = getController();
-    if (controller?.destinationGain) {
-      controller.destinationGain.connect(analyser);
+    if (controller?.output?.destinationGain) {
+      controller.output.destinationGain.connect(analyser);
     } else {
       console.warn("[AudioBridge] destinationGain not available");
       activatedRef.current = false;
