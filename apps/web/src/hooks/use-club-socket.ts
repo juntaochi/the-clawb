@@ -14,7 +14,7 @@ interface ClubState {
 
 export function useClubSocket() {
   const [state, setState] = useState<ClubState>({
-    djCode: DEFAULT_DJ_CODE, vjCode: DEFAULT_HYDRA_CODE,
+    djCode: "", vjCode: "",
     djAgent: null, vjAgent: null,
     audienceCount: 0, chatMessages: [],
   });
@@ -48,13 +48,20 @@ export function useClubSocket() {
       .then((data) => {
         setState((prev) => ({
           ...prev,
-          djCode: data.djCode || prev.djCode,
-          vjCode: data.vjCode || prev.vjCode,
+          djCode: data.djCode || DEFAULT_DJ_CODE,
+          vjCode: data.vjCode || DEFAULT_HYDRA_CODE,
           djAgent: data.djAgent?.name ?? null,
           vjAgent: data.vjAgent?.name ?? null,
         }));
       })
-      .catch(console.error);
+      .catch(() => {
+        // Server unreachable — fall back to defaults
+        setState((prev) => ({
+          ...prev,
+          djCode: prev.djCode || DEFAULT_DJ_CODE,
+          vjCode: prev.vjCode || DEFAULT_HYDRA_CODE,
+        }));
+      });
 
     // Fetch chat history
     fetch(`${apiUrl}/api/v1/chat/recent`)

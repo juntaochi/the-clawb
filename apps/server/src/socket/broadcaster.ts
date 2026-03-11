@@ -76,6 +76,15 @@ export function setupBroadcaster(
   const lastErrorAt: Record<string, number> = {};
 
   audienceNsp.on("connection", (socket) => {
+    // Send current code to newly connected client so refreshes don't flash defaults
+    const state = engine.getClubState();
+    if (state.dj.code) {
+      socket.emit("code:update", { type: "dj", code: state.dj.code, agentName: state.dj.agent?.name ?? "house" });
+    }
+    if (state.vj.code) {
+      socket.emit("code:update", { type: "vj", code: state.vj.code, agentName: state.vj.agent?.name ?? "house" });
+    }
+
     socket.on("code:error", (data: { type: string; error: string }) => {
       if (!data?.type || !data?.error) return;
       const slotType = data.type as "dj" | "vj";

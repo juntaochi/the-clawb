@@ -128,7 +128,7 @@ export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps
           height: "100%",
           border: "none",
           zIndex: 60,
-          opacity: 0,
+          opacity: 0.01,
           cursor: "pointer",
         }}
         title="Strudel audio sandbox"
