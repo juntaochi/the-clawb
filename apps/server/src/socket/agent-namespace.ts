@@ -2,6 +2,7 @@ import type { Server } from "socket.io";
 import { hashApiKey } from "../auth.js";
 import type { SessionEngine } from "../session-engine/engine.js";
 import type { AgentStore } from "../stores/agent-store.js";
+import { isValidSlotType, isNonEmptyString, sanitizeChatText } from "../validation.js";
 
 export function setupAgentNamespace(io: Server, engine: SessionEngine, agentStore: AgentStore): void {
   const agentNsp = io.of("/agent");
@@ -22,7 +23,19 @@ export function setupAgentNamespace(io: Server, engine: SessionEngine, agentStor
     socket.join(`agent:${agentId}`);
 
     socket.on("code:push", (data) => {
-      const result = engine.pushCode(agentId, data);
+      if (data == null || typeof data !== "object") {
+        socket.emit("code:ack", { ok: false, error: "invalid payload" });
+        return;
+      }
+      if (!isValidSlotType(data.type)) {
+        socket.emit("code:ack", { ok: false, error: "invalid slot type" });
+        return;
+      }
+      if (!isNonEmptyString(data.code)) {
+        socket.emit("code:ack", { ok: false, error: "code must be a non-empty string" });
+        return;
+      }
+      const result = engine.pushCode(agentId, { type: data.type, code: data.code });
       socket.emit("code:ack", result);
       // broadcast handled by bus → broadcaster
     });
@@ -31,9 +44,12 @@ export function setupAgentNamespace(io: Server, engine: SessionEngine, agentStor
     // and does not need the bus fan-out. If moderation/logging is added later,
     // route this through the bus instead.
     socket.on("chat:send", (data) => {
+      if (data == null || typeof data !== "object") return;
+      const text = sanitizeChatText(data.text);
+      if (text === null) return;
       io.of("/audience").emit("chat:message", {
         from: socket.data.agentName,
-        text: data.text,
+        text,
         timestamp: Date.now(),
       });
     });
