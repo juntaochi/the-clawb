@@ -42,7 +42,8 @@ export function useClubSocket() {
     });
 
     // Fetch initial state via REST
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/api/v1/sessions/current`)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    fetch(`${apiUrl}/api/v1/sessions/current`)
       .then((r) => r.json())
       .then((data) => {
         setState((prev) => ({
@@ -52,6 +53,19 @@ export function useClubSocket() {
           djAgent: data.djAgent?.name ?? null,
           vjAgent: data.vjAgent?.name ?? null,
         }));
+      })
+      .catch(console.error);
+
+    // Fetch chat history
+    fetch(`${apiUrl}/api/v1/chat/recent`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.messages) && data.messages.length > 0) {
+          setState((prev) => ({
+            ...prev,
+            chatMessages: data.messages,
+          }));
+        }
       })
       .catch(console.error);
 
