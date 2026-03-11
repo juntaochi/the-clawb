@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 0; height: 0; overflow: hidden; background: transparent; }
+</style>
+</head>
+<body>
+<script type="module">
+// Strudel Sandbox — runs inside a sandboxed iframe (allow-scripts only).
+// No access to parent DOM, cookies, localStorage, or parent-origin fetch.
+// Communication is exclusively via postMessage.
+
+// FFT analysis constants — mirrors use-strudel-audio-bridge.ts
+const NUM_BINS = 5;
+const FFT_SIZE = 4096;
+// Logarithmic frequency boundaries for 5 bins (Hz):
+// [0] sub-bass 20-80  [1] bass 80-250  [2] low-mid 250-1k  [3] mid 1k-4k  [4] high 4k-20k
+const FREQ_EDGES = [20, 80, 250, 1000, 4000, 20000];
+
+let strudel = null;
+let analyser = null;
+let rafId = null;
+
+async function doInit() {
+  try {
+    strudel = await import("https://esm.sh/@strudel/web@1.1.2");
+    await strudel.initStrudel();
+
+    // Ensure AudioContext is running
+    const getAudioContext = strudel.getAudioContext;
+    if (typeof getAudioContext === "function") {
+      const ctx = getAudioContext();
+      if (ctx.state === "suspended") await ctx.resume();
+    }
+
+    // Load default drum samples
+    await strudel.evaluate("await samples('github:tidalcycles/dirt-samples')");
+
+    // Set up FFT analysis for the audio bridge
+    setupAnalyser();
+
+    parent.postMessage({ type: "ready" }, "*");
+  } catch (err) {
+    parent.postMessage({ type: "error", message: "init failed: " + String(err) }, "*");
+  }
+}
+
+function setupAnalyser() {
+  try {
+    const getAudioContext = strudel.getAudioContext;
+    const getController = strudel.getSuperdoughAudioController;
+
+    if (typeof getAudioContext !== "function" || typeof getController !== "function") {
+      console.warn("[StrudelSandbox] required Strudel exports not found for analyser");
+      return;
+    }
+
+    const ctx = getAudioContext();
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = FFT_SIZE;
+    analyser.smoothingTimeConstant = 0.4;
+
+    // Connect to superdough's destinationGain
+    const controller = getController();
+    if (controller?.output?.destinationGain) {
+      controller.output.destinationGain.connect(analyser);
+    } else {
+      // Retry — the controller may not be fully wired until audio plays
+      let retries = 0;
+      const retryInterval = setInterval(() => {
+        retries++;
+        const ctrl = getController();
+        if (ctrl?.output?.destinationGain) {
+          ctrl.output.destinationGain.connect(analyser);
+          clearInterval(retryInterval);
+          startFftLoop(ctx);
+        } else if (retries >= 10) {
+          clearInterval(retryInterval);
+          console.warn("[StrudelSandbox] destinationGain not available after retries");
+        }
+      }, 200);
+      return;
+    }
+
+    startFftLoop(ctx);
+  } catch (err) {
+    console.warn("[StrudelSandbox] analyser setup error:", err);
+  }
+}
+
+function startFftLoop(ctx) {
+  if (rafId !== null || !analyser) return;
+
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Float32Array(bufferLength);
+  const sampleRate = ctx.sampleRate;
+  const binHz = sampleRate / FFT_SIZE;
+
+  // Precompute FFT index ranges for each frequency band
+  const binRanges = [];
+  for (let i = 0; i < NUM_BINS; i++) {
+    const lo = Math.max(0, Math.round(FREQ_EDGES[i] / binHz));
+    const hi = Math.min(bufferLength - 1, Math.round(FREQ_EDGES[i + 1] / binHz));
+    binRanges.push([lo, hi]);
+  }
+
+  const fft = new Float32Array(NUM_BINS);
+
+  // Also capture time-domain data for scope visualization
+  const timeData = new Float32Array(analyser.fftSize);
+
+  // Send FFT data to parent at ~30fps (every ~33ms) — not every rAF frame
+  let lastSend = 0;
+  const SEND_INTERVAL = 33;
+
+  // Downsample time-domain data for scope: send 512 samples instead of full fftSize
+  const SCOPE_SAMPLES = 512;
+
+  function loop() {
+    analyser.getFloatFrequencyData(dataArray);
+
+    for (let i = 0; i < NUM_BINS; i++) {
+      const [lo, hi] = binRanges[i];
+      let sum = 0;
+      const count = hi - lo + 1;
+      for (let j = lo; j <= hi; j++) {
+        sum += dataArray[j];
+      }
+      const avgDb = sum / count;
+      fft[i] = Math.max(0, Math.min(1, (avgDb + 70) / 60));
+    }
+
+    const now = performance.now();
+    if (now - lastSend >= SEND_INTERVAL) {
+      lastSend = now;
+
+      // Time-domain data for scope — downsample to SCOPE_SAMPLES
+      analyser.getFloatTimeDomainData(timeData);
+      const step = Math.floor(timeData.length / SCOPE_SAMPLES);
+      const scopeData = new Float32Array(SCOPE_SAMPLES);
+      for (let i = 0; i < SCOPE_SAMPLES; i++) {
+        scopeData[i] = timeData[i * step];
+      }
+
+      // Frequency data for scope — send raw freq data downsampled
+      const FREQ_SAMPLES = 256;
+      const freqStep = Math.floor(bufferLength / FREQ_SAMPLES);
+      const freqScopeData = new Float32Array(FREQ_SAMPLES);
+      for (let i = 0; i < FREQ_SAMPLES; i++) {
+        freqScopeData[i] = dataArray[i * freqStep];
+      }
+
+      parent.postMessage({
+        type: "audio",
+        fft: Array.from(fft),
+        scope: Array.from(scopeData),
+        freq: Array.from(freqScopeData),
+      }, "*");
+    }
+
+    rafId = requestAnimationFrame(loop);
+  }
+
+  loop();
+}
+
+window.addEventListener("message", (e) => {
+  const { type } = e.data || {};
+
+  if (type === "init") {
+    doInit();
+    return;
+  }
+
+  if (type === "eval") {
+    const code = e.data.code;
+    if (!strudel) {
+      parent.postMessage({ type: "error", message: "not initialized" }, "*");
+      return;
+    }
+    strudel.evaluate(code)
+      .then(() => {
+        parent.postMessage({ type: "ack" }, "*");
+        // If analyser isn't running yet, try to set it up now
+        // (first evaluate may have wired up destinationGain)
+        if (!rafId && analyser) {
+          const ctx = strudel.getAudioContext();
+          const ctrl = strudel.getSuperdoughAudioController();
+          if (ctrl?.output?.destinationGain) {
+            try { ctrl.output.destinationGain.connect(analyser); } catch {}
+            startFftLoop(ctx);
+          }
+        } else if (!analyser) {
+          setupAnalyser();
+        }
+      })
+      .catch((err) => {
+        parent.postMessage({ type: "error", message: String(err) }, "*");
+      });
+    return;
+  }
+
+  if (type === "hush") {
+    try {
+      if (strudel) strudel.hush();
+      parent.postMessage({ type: "ack" }, "*");
+    } catch (err) {
+      parent.postMessage({ type: "error", message: String(err) }, "*");
+    }
+    return;
+  }
+});
+</script>
+</body>
+</html>

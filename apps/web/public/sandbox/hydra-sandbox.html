@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, canvas { width: 100%; height: 100%; display: block; overflow: hidden; background: #000; }
+</style>
+</head>
+<body>
+<canvas id="hydra-canvas"></canvas>
+<script type="module">
+// Hydra Sandbox — runs inside a sandboxed iframe (allow-scripts only).
+// No access to parent DOM, cookies, localStorage, or parent-origin fetch.
+// Communication is exclusively via postMessage.
+
+const NUM_BINS = 5;
+
+// Audio stub — parent sends FFT data via postMessage
+const fft = new Float32Array(NUM_BINS);
+window.a = {
+  fft,
+  setSmooth() {}, setScale() {}, setCutoff() {},
+  setBands() {}, setBins() {}, show() {}, hide() {},
+};
+
+const canvas = document.getElementById("hydra-canvas");
+canvas.width = window.innerWidth || 1280;
+canvas.height = window.innerHeight || 720;
+
+let hydra = null;
+
+async function init() {
+  try {
+    const { default: Hydra } = await import("https://esm.sh/hydra-synth@1.3.29");
+
+    hydra = new Hydra({
+      canvas,
+      width: canvas.width,
+      height: canvas.height,
+      detectAudio: false,
+      makeGlobal: true,
+      autoLoop: true,
+      enableStreamCapture: false,
+      numSources: 4,
+      numOutputs: 4,
+    });
+
+    // hydra-synth with makeGlobal:true + detectAudio:false may overwrite window.a.
+    // Re-establish the stub so a.fft[] reads don't throw.
+    window.a = {
+      fft,
+      setSmooth() {}, setScale() {}, setCutoff() {},
+      setBands() {}, setBins() {}, show() {}, hide() {},
+    };
+
+    parent.postMessage({ type: "ready" }, "*");
+  } catch (err) {
+    parent.postMessage({ type: "error", message: "init failed: " + String(err) }, "*");
+  }
+}
+
+window.addEventListener("message", (e) => {
+  const { type } = e.data || {};
+
+  if (type === "eval") {
+    const code = e.data.code;
+    try {
+      if (hydra) {
+        hydra.hush();
+        hydra.eval(code);
+      }
+      parent.postMessage({ type: "ack" }, "*");
+    } catch (err) {
+      parent.postMessage({ type: "error", message: String(err) }, "*");
+    }
+    return;
+  }
+
+  if (type === "resize") {
+    const { width, height } = e.data;
+    if (width > 0 && height > 0) {
+      canvas.width = Math.round(width);
+      canvas.height = Math.round(height);
+      if (hydra) {
+        hydra.setResolution(canvas.width, canvas.height);
+      }
+    }
+    return;
+  }
+
+  if (type === "audio") {
+    const incoming = e.data.fft;
+    if (incoming && fft) {
+      for (let i = 0; i < NUM_BINS && i < incoming.length; i++) {
+        fft[i] = incoming[i];
+      }
+      // Also update window.a.fft in case hydra-synth replaced it
+      const liveA = window.a;
+      if (liveA && liveA.fft && liveA.fft !== fft) {
+        for (let i = 0; i < NUM_BINS && i < incoming.length; i++) {
+          liveA.fft[i] = incoming[i];
+        }
+      }
+    }
+    return;
+  }
+});
+
+init();
+</script>
+</body>
+</html>
