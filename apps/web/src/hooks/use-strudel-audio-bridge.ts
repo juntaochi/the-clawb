@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
-const NUM_BINS = 4;
+const NUM_BINS = 5;
 const FFT_SIZE = 1024;
 
 /**
@@ -60,11 +60,14 @@ export function useStrudelAudioBridge() {
     const aObj = {
       fft,
       // Stub methods agents may call — we handle smoothing in the analyser node
+      // Stubs — smoothing/scaling handled by the AnalyserNode itself
       setSmooth: (_v: number) => {},
       setScale: (_v: number) => {},
       setCutoff: (_v: number) => {},
       setBands: (_v: number) => {},
+      setBins: (_v: number) => {},
       show: () => {},
+      hide: () => {},
     };
     (globalThis as Record<string, unknown>)["a"] = aObj;
 

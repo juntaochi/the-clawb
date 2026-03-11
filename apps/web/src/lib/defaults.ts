@@ -53,24 +53,26 @@ stack(
     .orbit(3)
 )`;
 
-export const DEFAULT_HYDRA_CODE = `osc(() => 3 + a.fft[0] * 18, 0.03, () => a.fft[2] * Math.PI)
-  .color(
-    () => 0.3 + a.fft[0] * 0.6,
-    () => 0.1 + a.fft[1] * 0.2,
-    () => 0.6 + a.fft[2] * 0.4
-  )
-  .modulate(
-    noise(() => 1.5 + a.fft[2] * 7),
-    () => a.fft[0] * 0.22
-  )
-  .blend(
-    src(o0)
-      .scale(() => 1.002 + a.fft[0] * 0.006)
-      .rotate(() => a.fft[1] * 0.003)
-      .brightness(-0.012),
-    () => 0.82 - a.fft[0] * 0.20
-  )
-  .kaleid(6)
-  .saturate(() => 1.2 + a.fft[0] * 2.0)
-  .brightness(() => 0.05 + a.fft[0] * 0.15)
-  .out(o0)`;
+export const DEFAULT_HYDRA_CODE = `a.setBins(5)
+a.setSmooth(0.75)
+a.setScale(5)
+a.setCutoff(0.3)
+a.hide()
+
+shape([4, 5, 6].fast(0.1).smooth(1), 0.000001, [0.2, 0.7].smooth(1))
+  .color(0.2, 0.4, 0.3)
+  .scrollX(() => Math.sin(time * 0.27) + a.fft[0] * 0.5)
+  .add(shape([4, 5, 6].fast(0.1).smooth(1), 0.000001, [0.2, 0.7, 0.5, 0.3].smooth(1))
+    .color(0.6, 0.2, 0.5)
+    .scrollY(0.35 + a.fft[4] * 0.5)
+    .scrollX(() => Math.sin(time * 0.33) + a.fft[4] * 0.5))
+  .add(shape([4, 5, 6].fast(0.1).smooth(1), 0.000001, [0.2, 0.7, 0.3].smooth(1))
+    .color(0.2, 0.4, 0.6)
+    .scrollY(-0.35 - a.fft[0] * 0.5)
+    .scrollX(() => Math.sin(time * 0.41) * -1 + a.fft[0] * 0.5))
+  .add(src(o0)
+    .shift(0.001, 0.001, 0.001)
+    .scrollX([0.05, -0.05].fast(0.1).smooth(1))
+    .scale([1.05, 0.9].fast(0.3).smooth(1.726), [1.05, 0.9, 1].fast(0.29).smooth(1)), 0.85)
+  .modulate(voronoi(10, 2, 2))
+  .out()`;
