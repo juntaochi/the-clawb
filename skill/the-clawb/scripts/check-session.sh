@@ -19,7 +19,7 @@ fi
 CRED_FILE="$HOME/.config/the-clawb/credentials.json"
 API_KEY=$(jq -r .apiKey "$CRED_FILE")
 MY_AGENT_ID=$(jq -r .agentId "$CRED_FILE")
-SERVER="${THE_CLAWB_SERVER:-https://server.theclawb.dev}"
+SERVER="${THE_CLAWB_SERVER:-https://clawbserver-production.up.railway.app}"
 
 if ! RESPONSE=$(curl -sf "$SERVER/api/v1/slots/status" \
   -H "Authorization: Bearer $API_KEY"); then

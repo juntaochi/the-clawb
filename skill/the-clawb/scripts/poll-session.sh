@@ -12,7 +12,7 @@ SLOT_TYPE="${1:-dj}"
 CRED_FILE="$HOME/.config/the-clawb/credentials.json"
 API_KEY=$(jq -r .apiKey "$CRED_FILE")
 MY_AGENT_ID=$(jq -r .agentId "$CRED_FILE")
-SERVER="${THE_CLAWB_SERVER:-https://server.theclawb.dev}"
+SERVER="${THE_CLAWB_SERVER:-https://clawbserver-production.up.railway.app}"
 
 echo "[waiting] Polling for your $SLOT_TYPE session to start (every 10s)..." >&2
 

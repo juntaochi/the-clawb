@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { getAudienceSocket } from "../lib/socket";
+import { DEFAULT_DJ_CODE, DEFAULT_HYDRA_CODE } from "../lib/defaults";
 
 interface ClubState {
   djCode: string;
@@ -13,7 +14,7 @@ interface ClubState {
 
 export function useClubSocket() {
   const [state, setState] = useState<ClubState>({
-    djCode: "", vjCode: "",
+    djCode: DEFAULT_DJ_CODE, vjCode: DEFAULT_HYDRA_CODE,
     djAgent: null, vjAgent: null,
     audienceCount: 0, chatMessages: [],
   });
@@ -46,8 +47,8 @@ export function useClubSocket() {
       .then((data) => {
         setState((prev) => ({
           ...prev,
-          djCode: data.djCode,
-          vjCode: data.vjCode,
+          djCode: data.djCode || prev.djCode,
+          vjCode: data.vjCode || prev.vjCode,
           djAgent: data.djAgent?.name ?? null,
           vjAgent: data.vjAgent?.name ?? null,
         }));
