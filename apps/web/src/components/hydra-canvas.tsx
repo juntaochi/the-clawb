@@ -3,6 +3,23 @@
 import { useEffect, useRef, useCallback } from "react";
 import type HydraRenderer from "hydra-synth";
 
+const A_STUB_BINS = 5;
+
+/** Ensure window.a exists with a fft Float32Array and no-op methods. */
+function ensureAStub() {
+  const existing = (globalThis as Record<string, unknown>)["a"] as
+    | { fft?: Float32Array }
+    | null
+    | undefined;
+  if (existing?.fft instanceof Float32Array) return; // already a live stub
+  const fft = new Float32Array(A_STUB_BINS);
+  (globalThis as Record<string, unknown>)["a"] = {
+    fft,
+    setSmooth: () => {}, setScale: () => {}, setCutoff: () => {},
+    setBands: () => {}, setBins: () => {}, show: () => {}, hide: () => {},
+  };
+}
+
 /**
  * HydraCanvas -- renders audio-reactive Hydra visuals on a <canvas>.
  *
@@ -69,6 +86,10 @@ export function HydraCanvas({ code, className }: HydraCanvasProps) {
         });
 
         hydraRef.current = hydra;
+
+        // hydra-synth with makeGlobal:true + detectAudio:false sets window.a = undefined,
+        // overwriting any stub we set earlier. Re-establish it so a.fft[] doesn't throw.
+        ensureAStub();
       } catch (err) {
         console.error("[HydraCanvas] failed to initialize hydra-synth:", err);
       }
@@ -125,7 +146,7 @@ export function HydraCanvas({ code, className }: HydraCanvasProps) {
   }, []);
 
   return (
-    <div className={className} style={{ position: "relative", overflow: "hidden" }}>
+    <div className={className} style={{ overflow: "hidden" }}>
       <canvas
         ref={canvasRef}
         width={1280}

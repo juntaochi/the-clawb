@@ -71,8 +71,16 @@ export function useStrudelAudioBridge() {
     const dataArray = new Float32Array(bufferLength);
     const binSize = Math.floor(bufferLength / NUM_BINS);
 
-    // Reuse the stub already on window.a — just start filling it with real data
-    const fft = fftRef.current;
+    // Re-set window.a with a fresh live fft array.
+    // Hydra may have overwritten window.a (to undefined) during init with detectAudio:false.
+    const fft = new Float32Array(NUM_BINS);
+    fftRef.current = fft;
+    (globalThis as Record<string, unknown>)["a"] = {
+      fft,
+      setSmooth: (_v: number) => {}, setScale: (_v: number) => {},
+      setCutoff: (_v: number) => {}, setBands: (_v: number) => {},
+      setBins: (_v: number) => {}, show: () => {}, hide: () => {},
+    };
 
     function loop() {
       analyser.getFloatFrequencyData(dataArray);
