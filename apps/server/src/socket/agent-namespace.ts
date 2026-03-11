@@ -57,5 +57,9 @@ export function setupAgentNamespace(io: Server, engine: SessionEngine, agentStor
         role: "agent",
       });
     });
+
+    socket.on("disconnect", () => {
+      chatLimiter.remove(agentId);
+    });
   });
 }
