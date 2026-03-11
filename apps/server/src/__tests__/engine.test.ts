@@ -39,7 +39,7 @@ describe("SessionEngine", () => {
 
   it("books a slot and queues agent", () => {
     const result = engine.bookSlot("agent-1", "DJ One", "dj");
-    expect(result.position).toBe(0);
+    expect(result).toHaveProperty("position", 0);
   });
 
   it("activates session when slot is idle and agent is next in queue", () => {

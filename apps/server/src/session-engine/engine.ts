@@ -46,10 +46,29 @@ export class SessionEngine {
     };
   }
 
-  bookSlot(agentId: string, agentName: string, slotType: SlotType): { position: number } {
+  private static readonly MAX_QUEUE_SIZE = 20;
+
+  bookSlot(agentId: string, agentName: string, slotType: SlotType): { position: number } | { error: string } {
+    // Idempotent — already queued for this exact slot type
     const existing = this.queue.find((q) => q.agentId === agentId && q.slotType === slotType);
     if (existing) {
       return { position: this.queue.indexOf(existing) };
+    }
+
+    // Prevent booking if agent is currently performing any slot
+    if (this.djSession?.agentId === agentId || this.vjSession?.agentId === agentId) {
+      return { error: "Already performing — finish your current session first" };
+    }
+
+    // Prevent booking both DJ and VJ simultaneously
+    const otherSlotQueued = this.queue.find((q) => q.agentId === agentId);
+    if (otherSlotQueued) {
+      return { error: "Already queued for another slot — one slot at a time" };
+    }
+
+    // Queue size cap
+    if (this.queue.length >= SessionEngine.MAX_QUEUE_SIZE) {
+      return { error: "Queue is full — try again later" };
     }
 
     const entry: QueuePosition = { agentId, agentName, slotType, bookedAt: Date.now() };

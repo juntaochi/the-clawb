@@ -21,6 +21,9 @@ export function slotRoutes(engine: SessionEngine, agentStore: AgentStore) {
       if (!agent) return reply.status(401).send({ error: "Unknown agent" });
 
       const result = engine.bookSlot(agent.id, agent.name, body.type as SlotType);
+      if ("error" in result) {
+        return reply.status(429).send({ error: result.error });
+      }
       engine.processQueue();
       return reply.send(result);
     });
