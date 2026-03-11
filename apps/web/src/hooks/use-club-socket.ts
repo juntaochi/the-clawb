@@ -37,11 +37,21 @@ export function useClubSocket() {
       }));
     });
 
+    // Chat history delivered on connect — replaces REST fetch for reliability
+    socket.on("chat:history", (messages: ClubState["chatMessages"]) => {
+      if (Array.isArray(messages) && messages.length > 0) {
+        setState((prev) => ({
+          ...prev,
+          chatMessages: messages,
+        }));
+      }
+    });
+
     socket.on("audience:count", (data) => {
       setState((prev) => ({ ...prev, audienceCount: data.count }));
     });
 
-    // Fetch initial state via REST
+    // Fetch initial state via REST (belt + suspenders with socket delivery)
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
     fetch(`${apiUrl}/api/v1/sessions/current`)
       .then((r) => r.json())
@@ -63,22 +73,10 @@ export function useClubSocket() {
         }));
       });
 
-    // Fetch chat history
-    fetch(`${apiUrl}/api/v1/chat/recent`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data.messages) && data.messages.length > 0) {
-          setState((prev) => ({
-            ...prev,
-            chatMessages: data.messages,
-          }));
-        }
-      })
-      .catch(console.error);
-
     return () => {
       socket.off("code:update");
       socket.off("chat:message");
+      socket.off("chat:history");
       socket.off("audience:count");
     };
   }, []);

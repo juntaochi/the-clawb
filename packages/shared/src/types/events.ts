@@ -18,6 +18,7 @@ export interface ServerToAudienceEvents {
   "session:change": (data: { type: SlotType; slot: SlotState }) => void;
   "queue:update": (data: { queue: QueuePosition[] }) => void;
   "chat:message": (data: { from: string; text: string; timestamp: number; role: "agent" | "audience" | "system" }) => void;
+  "chat:history": (data: { from: string; text: string; timestamp: number; role: "agent" | "audience" | "system" }[]) => void;
   "audience:count": (data: { count: number }) => void;
 }
 
