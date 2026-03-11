@@ -1,124 +1,90 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
-import type HydraRenderer from "hydra-synth";
-
-const A_STUB_BINS = 5;
-
-/** Ensure window.a exists with a fft Float32Array and no-op methods. */
-function ensureAStub() {
-  const existing = (globalThis as Record<string, unknown>)["a"] as
-    | { fft?: Float32Array }
-    | null
-    | undefined;
-  if (existing?.fft instanceof Float32Array) return; // already a live stub
-  const fft = new Float32Array(A_STUB_BINS);
-  (globalThis as Record<string, unknown>)["a"] = {
-    fft,
-    setSmooth: () => {}, setScale: () => {}, setCutoff: () => {},
-    setBands: () => {}, setBins: () => {}, show: () => {}, hide: () => {},
-  };
-}
+import { SandboxBridge } from "../lib/sandbox-bridge";
 
 /**
- * HydraCanvas -- renders audio-reactive Hydra visuals on a <canvas>.
+ * HydraCanvas -- renders audio-reactive Hydra visuals in a sandboxed iframe.
  *
  * Props:
  *   code      - Hydra code string (e.g. "osc(4,0.1,1.2).out()")
  *   className - optional CSS class for the wrapper div
+ *   onBridgeReady - called with a function that sends FFT data to the Hydra sandbox
  *
- * Internally we dynamic-import `hydra-synth` (it requires browser globals)
- * and create a single HydraRenderer instance attached to our canvas.
- * When `code` changes, we hush the previous visuals and eval the new code.
+ * The Hydra engine runs inside `<iframe sandbox="allow-scripts">` which
+ * prevents eval'd code from accessing the parent document, cookies,
+ * localStorage, or fetching against the parent origin.
  *
- * Audio reactivity is enabled by default (uses Meyda + getUserMedia).
- * The a0..a3 functions are available in Hydra code for FFT-driven visuals.
+ * Communication is exclusively via postMessage through SandboxBridge.
  */
 
 interface HydraCanvasProps {
   code: string;
   className?: string;
+  /** Called once the Hydra sandbox is ready, providing a function to send FFT data. */
+  onBridgeReady?: (sendFft: (fft: number[]) => void) => void;
 }
 
-export function HydraCanvas({ code, className }: HydraCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const hydraRef = useRef<HydraRenderer | null>(null);
-  const initPromiseRef = useRef<Promise<void> | null>(null);
+export function HydraCanvas({ code, className, onBridgeReady }: HydraCanvasProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const bridgeRef = useRef<SandboxBridge | null>(null);
+  const readyRef = useRef<Promise<void> | null>(null);
+  const lastCodeRef = useRef<string>("");
 
-  // Stable eval function that waits for init before evaluating
+  // Stable eval function that waits for the sandbox to be ready
   const evalCode = useCallback(async (newCode: string) => {
-    // Wait for any pending init
-    if (initPromiseRef.current) {
-      await initPromiseRef.current;
+    if (readyRef.current) {
+      await readyRef.current;
     }
-    const hydra = hydraRef.current;
-    if (!hydra || !newCode) return;
+    const bridge = bridgeRef.current;
+    if (!bridge || !newCode) return;
 
-    try {
-      hydra.hush();
-      hydra.eval(newCode);
-    } catch (err) {
-      console.warn("[HydraCanvas] eval error:", err);
-    }
+    bridge.send("eval", { code: newCode });
   }, []);
 
-  // Initialize hydra-synth once on mount
+  // Initialize the sandbox bridge on mount
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || hydraRef.current) return;
+    const iframe = iframeRef.current;
+    if (!iframe || bridgeRef.current) return;
 
-    initPromiseRef.current = (async () => {
-      try {
-        // Dynamic import — hydra-synth uses browser globals (navigator, window, document)
-        // and ships raw ESM source, so it must be client-only.
-        const { default: Hydra } = await import("hydra-synth");
+    const bridge = new SandboxBridge(iframe);
+    bridgeRef.current = bridge;
+    readyRef.current = bridge.waitReady();
 
-        const hydra = new Hydra({
-          canvas,
-          width: canvas.width,
-          height: canvas.height,
-          detectAudio: false, // We bridge Strudel audio → a0–a3 ourselves
-          makeGlobal: true, // required — eval sandbox uses globalThis.eval and needs generators on window
-          autoLoop: true,
-          enableStreamCapture: false,
-          numSources: 4,
-          numOutputs: 4,
-        });
+    // Listen for errors from the sandbox
+    bridge.on("error", (data) => {
+      console.warn("[HydraCanvas] sandbox error:", data.message);
+    });
 
-        hydraRef.current = hydra;
-
-        // hydra-synth with makeGlobal:true + detectAudio:false sets window.a = undefined,
-        // overwriting any stub we set earlier. Re-establish it so a.fft[] doesn't throw.
-        ensureAStub();
-      } catch (err) {
-        console.error("[HydraCanvas] failed to initialize hydra-synth:", err);
-      }
-    })();
+    // Notify parent when ready, providing the FFT sender
+    readyRef.current.then(() => {
+      onBridgeReady?.((fft: number[]) => {
+        bridge.send("audio", { fft });
+      });
+    });
 
     return () => {
-      // On unmount, hush to stop rendering
-      if (hydraRef.current) {
-        try {
-          hydraRef.current.hush();
-        } catch {
-          // ignore cleanup errors
-        }
-        hydraRef.current = null;
-      }
+      bridge.destroy();
+      bridgeRef.current = null;
+      readyRef.current = null;
     };
+  // onBridgeReady is intentionally excluded — we only bind it once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Re-evaluate whenever code changes
   useEffect(() => {
-    if (code) {
+    if (code && code !== lastCodeRef.current) {
+      lastCodeRef.current = code;
       evalCode(code);
     }
   }, [code, evalCode]);
 
-  // Resize canvas to match container (debounced to avoid hydra-synth log spam)
+  // ResizeObserver: send resize messages to the iframe
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!container) return;
 
     let rafId: number | null = null;
     const ro = new ResizeObserver((entries) => {
@@ -129,16 +95,14 @@ export function HydraCanvas({ code, className }: HydraCanvasProps) {
           const { width, height } = entry.contentRect;
           const w = Math.round(width);
           const h = Math.round(height);
-          if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
-            canvas.width = w;
-            canvas.height = h;
-            hydraRef.current?.setResolution(w, h);
+          if (w > 0 && h > 0) {
+            bridgeRef.current?.send("resize", { width: w, height: h });
           }
         }
       });
     });
 
-    ro.observe(canvas);
+    ro.observe(container);
     return () => {
       ro.disconnect();
       if (rafId) cancelAnimationFrame(rafId);
@@ -146,17 +110,18 @@ export function HydraCanvas({ code, className }: HydraCanvasProps) {
   }, []);
 
   return (
-    <div className={className} style={{ overflow: "hidden" }}>
-      <canvas
-        ref={canvasRef}
-        width={1280}
-        height={720}
+    <div ref={containerRef} className={className} style={{ overflow: "hidden" }}>
+      <iframe
+        ref={iframeRef}
+        sandbox="allow-scripts"
+        src="/sandbox/hydra-sandbox.html"
         style={{
           width: "100%",
           height: "100%",
           display: "block",
-          imageRendering: "auto",
+          border: "none",
         }}
+        title="Hydra visual sandbox"
       />
     </div>
   );

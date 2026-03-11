@@ -3,53 +3,59 @@
 import { useEffect, useRef } from "react";
 
 interface StrudelScopeProps {
-  analyserNode: AnalyserNode | null;
+  /** Time-domain (waveform) samples, updated in-place by the audio bridge. */
+  scopeData: React.RefObject<Float32Array>;
+  /** Frequency-domain samples, updated in-place by the audio bridge. */
+  freqData: React.RefObject<Float32Array>;
+  /** Whether the audio bridge is actively receiving data. */
+  active: boolean;
   className?: string;
 }
 
 const PEAK_DECAY = 0.994; // how slowly peaks fall
+const BAR_COUNT = 80;
 
-export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
+export function StrudelScope({ scopeData, freqData, active, className }: StrudelScopeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
+  const peaksRef = useRef<Float32Array>(new Float32Array(BAR_COUNT));
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !analyserNode) return;
+    if (!canvas || !active) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const timeData = new Float32Array(analyserNode.fftSize);
-    const freqData = new Float32Array(analyserNode.frequencyBinCount);
-    const BAR_COUNT = 80;
-    const peaks = new Float32Array(BAR_COUNT);
+    const peaks = peaksRef.current;
 
     function draw() {
       const w = canvas!.width;
       const h = canvas!.height;
-      const scopeH = Math.round(h * 0.35); // top 35% — waveform
-      const specH = h - scopeH;             // bottom 65% — spectrum
+      const scopeH = Math.round(h * 0.35); // top 35% -- waveform
+      const specH = h - scopeH;             // bottom 65% -- spectrum
 
-      analyserNode!.getFloatTimeDomainData(timeData);
-      analyserNode!.getFloatFrequencyData(freqData);
+      const timeData = scopeData.current;
+      const freqArr = freqData.current;
 
       // --- Background ---
       ctx!.clearRect(0, 0, w, h);
 
       // --- Waveform ---
-      const sliceW = w / timeData.length;
+      if (timeData && timeData.length > 0) {
+        const sliceW = w / timeData.length;
 
-      ctx!.strokeStyle = "rgba(255,255,255,0.6)";
-      ctx!.lineWidth = 1;
-      ctx!.beginPath();
-      for (let i = 0; i < timeData.length; i++) {
-        const v = timeData[i]!;
-        const y = scopeH * 0.5 + v * scopeH * 0.42;
-        if (i === 0) ctx!.moveTo(0, y);
-        else ctx!.lineTo(i * sliceW, y);
+        ctx!.strokeStyle = "rgba(255,255,255,0.6)";
+        ctx!.lineWidth = 1;
+        ctx!.beginPath();
+        for (let i = 0; i < timeData.length; i++) {
+          const v = timeData[i]!;
+          const y = scopeH * 0.5 + v * scopeH * 0.42;
+          if (i === 0) ctx!.moveTo(0, y);
+          else ctx!.lineTo(i * sliceW, y);
+        }
+        ctx!.stroke();
       }
-      ctx!.stroke();
 
       // Divider
       ctx!.strokeStyle = "rgba(255,255,255,0.08)";
@@ -60,30 +66,32 @@ export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
       ctx!.stroke();
 
       // --- Spectrum bars ---
-      const binCount = freqData.length;
-      const barW = w / BAR_COUNT;
+      if (freqArr && freqArr.length > 0) {
+        const binCount = freqArr.length;
+        const barW = w / BAR_COUNT;
 
-      for (let i = 0; i < BAR_COUNT; i++) {
-        const binIndex = Math.floor(
-          Math.pow(i / BAR_COUNT, 1.8) * binCount
-        );
-        const db = freqData[Math.min(binIndex, binCount - 1)]!;
-        const normalized = Math.max(0, (db + 100) / 100);
-        const barH = normalized * specH * 0.92;
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const binIndex = Math.floor(
+            Math.pow(i / BAR_COUNT, 1.8) * binCount
+          );
+          const db = freqArr[Math.min(binIndex, binCount - 1)]!;
+          const normalized = Math.max(0, (db + 100) / 100);
+          const barH = normalized * specH * 0.92;
 
-        ctx!.fillStyle = `rgba(255,255,255,${0.15 + normalized * 0.45})`;
-        ctx!.fillRect(
-          i * barW,
-          scopeH + specH - barH,
-          Math.max(barW - 1, 1),
-          barH
-        );
+          ctx!.fillStyle = `rgba(255,255,255,${0.15 + normalized * 0.45})`;
+          ctx!.fillRect(
+            i * barW,
+            scopeH + specH - barH,
+            Math.max(barW - 1, 1),
+            barH
+          );
 
-        // Peak hold
-        peaks[i] = Math.max(peaks[i]! * PEAK_DECAY, normalized);
-        const peakY = scopeH + specH - peaks[i]! * specH * 0.92;
-        ctx!.fillStyle = "rgba(255,255,255,0.5)";
-        ctx!.fillRect(i * barW, peakY, Math.max(barW - 1, 1), 1);
+          // Peak hold
+          peaks[i] = Math.max(peaks[i]! * PEAK_DECAY, normalized);
+          const peakY = scopeH + specH - peaks[i]! * specH * 0.92;
+          ctx!.fillStyle = "rgba(255,255,255,0.5)";
+          ctx!.fillRect(i * barW, peakY, Math.max(barW - 1, 1), 1);
+        }
       }
 
       rafRef.current = requestAnimationFrame(draw);
@@ -97,7 +105,7 @@ export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
         rafRef.current = null;
       }
     };
-  }, [analyserNode]);
+  }, [active, scopeData, freqData]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -119,7 +127,7 @@ export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
     return () => ro.disconnect();
   }, []);
 
-  if (!analyserNode) return null;
+  if (!active) return null;
 
   return (
     <div className={className} style={{ position: "relative", overflow: "hidden" }}>
