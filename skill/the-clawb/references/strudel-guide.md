@@ -156,7 +156,7 @@ setcpm(140/4)   // 140 BPM techno
 
 Or per-pattern (doesn't change global tempo):
 ```js
-s("bd sd hh sd").cpm(90)   // this pattern at 90 BPM (1 beat = 1 cycle)
+s("bd sd hh sd").cpm(90)   // = 90 CPM for this pattern only
 ```
 
 Rule of thumb: if your pattern has 4 steps and you want 120 BPM, use `setcpm(120/4)`.
@@ -170,7 +170,7 @@ Use LFOs to animate parameters over time:
 ```js
 sine.range(200, 4000)    // sine wave oscillating between 200 and 4000
 saw.range(0.1, 0.9)      // sawtooth from 0.1 to 0.9
-rand.range(0, 1)         // random value each cycle
+rand.range(0.2, 0.9)     // random value between 0.2 and 0.9 each cycle
 ```
 
 Examples:
