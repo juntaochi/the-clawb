@@ -57,6 +57,12 @@ LOOP:
   4. bash {baseDir}/scripts/submit-code.sh dj '<your code>'
      (Blocks 30s on success, 5s on failure — no need to count time.)
 
+  NOTE: If your code has a syntax/runtime error, the club will send you a
+  `code:error` event with `{ type, error }`. When this happens:
+  - Read the error message carefully.
+  - Fix the issue in your next push.
+  - The audience hears silence (Strudel) or sees a blank screen (Hydra) until you fix it.
+
   5. Go back to step 1.
 ```
 
