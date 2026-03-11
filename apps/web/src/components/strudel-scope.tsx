@@ -35,43 +35,13 @@ export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
       analyserNode!.getFloatFrequencyData(freqData);
 
       // --- Background ---
-      ctx!.fillStyle = "rgba(0,0,0,0.92)";
-      ctx!.fillRect(0, 0, w, h);
-
-      // --- Subtle grid lines (spectrum area) ---
-      ctx!.strokeStyle = "rgba(255,255,255,0.04)";
-      ctx!.lineWidth = 1;
-      for (let row = 0; row <= 4; row++) {
-        const y = scopeH + (specH / 4) * row;
-        ctx!.beginPath();
-        ctx!.moveTo(0, y);
-        ctx!.lineTo(w, y);
-        ctx!.stroke();
-      }
+      ctx!.clearRect(0, 0, w, h);
 
       // --- Waveform ---
       const sliceW = w / timeData.length;
 
-      // Glow pass
-      ctx!.save();
-      ctx!.globalAlpha = 0.25;
-      ctx!.strokeStyle = "#00ff88";
-      ctx!.lineWidth = 4;
-      ctx!.shadowColor = "#00ff88";
-      ctx!.shadowBlur = 8;
-      ctx!.beginPath();
-      for (let i = 0; i < timeData.length; i++) {
-        const v = timeData[i]!;
-        const y = scopeH * 0.5 + v * scopeH * 0.42;
-        if (i === 0) ctx!.moveTo(0, y);
-        else ctx!.lineTo(i * sliceW, y);
-      }
-      ctx!.stroke();
-      ctx!.restore();
-
-      // Crisp pass
-      ctx!.strokeStyle = "#00ff88";
-      ctx!.lineWidth = 1.5;
+      ctx!.strokeStyle = "rgba(255,255,255,0.6)";
+      ctx!.lineWidth = 1;
       ctx!.beginPath();
       for (let i = 0; i < timeData.length; i++) {
         const v = timeData[i]!;
@@ -82,7 +52,7 @@ export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
       ctx!.stroke();
 
       // Divider
-      ctx!.strokeStyle = "rgba(255,255,255,0.10)";
+      ctx!.strokeStyle = "rgba(255,255,255,0.08)";
       ctx!.lineWidth = 1;
       ctx!.beginPath();
       ctx!.moveTo(0, scopeH);
@@ -94,7 +64,6 @@ export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
       const barW = w / BAR_COUNT;
 
       for (let i = 0; i < BAR_COUNT; i++) {
-        // Map bar index to logarithmic frequency bin
         const binIndex = Math.floor(
           Math.pow(i / BAR_COUNT, 1.8) * binCount
         );
@@ -102,11 +71,7 @@ export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
         const normalized = Math.max(0, (db + 100) / 100);
         const barH = normalized * specH * 0.92;
 
-        // Color: low freq = violet, mid = cyan, high = white-blue
-        const hue = 260 - (i / BAR_COUNT) * 120; // 260 (violet) → 140 (cyan)
-        const lightness = 45 + normalized * 20;
-
-        ctx!.fillStyle = `hsl(${hue}, 100%, ${lightness}%)`;
+        ctx!.fillStyle = `rgba(255,255,255,${0.15 + normalized * 0.45})`;
         ctx!.fillRect(
           i * barW,
           scopeH + specH - barH,
@@ -117,8 +82,8 @@ export function StrudelScope({ analyserNode, className }: StrudelScopeProps) {
         // Peak hold
         peaks[i] = Math.max(peaks[i]! * PEAK_DECAY, normalized);
         const peakY = scopeH + specH - peaks[i]! * specH * 0.92;
-        ctx!.fillStyle = `hsla(${hue}, 100%, 85%, 0.7)`;
-        ctx!.fillRect(i * barW, peakY, Math.max(barW - 1, 1), 2);
+        ctx!.fillStyle = "rgba(255,255,255,0.5)";
+        ctx!.fillRect(i * barW, peakY, Math.max(barW - 1, 1), 1);
       }
 
       rafRef.current = requestAnimationFrame(draw);
