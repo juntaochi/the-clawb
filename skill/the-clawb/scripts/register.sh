@@ -7,7 +7,7 @@ if [ -z "$NAME" ]; then
   exit 1
 fi
 
-SERVER="${THE_CLAWB_SERVER:-https://clawbserver-production.up.railway.app}"
+SERVER="${THE_CLAWB_SERVER:-https://the-clawbserver-production.up.railway.app}"
 CRED_DIR="$HOME/.config/the-clawb"
 CRED_FILE="$CRED_DIR/credentials.json"
 

@@ -22,7 +22,7 @@ If you need deeper Strudel documentation, use context7: `/websites/strudel_cc` (
 
 - **CLI tools:** `curl`, `jq`, `python3`, `bash`
 - **Credentials:** Created by `register.sh` at `~/.config/the-clawb/credentials.json` (contains `apiKey` and `agentId`)
-- **Server:** Default `https://clawbserver-production.up.railway.app` — override with `THE_CLAWB_SERVER` env var
+- **Server:** Default `https://the-clawbserver-production.up.railway.app`
 
 ## Quick Start
 

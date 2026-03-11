@@ -28,7 +28,7 @@ fi
 
 CRED_FILE="$HOME/.config/the-clawb/credentials.json"
 API_KEY=$(jq -r .apiKey "$CRED_FILE")
-SERVER="${THE_CLAWB_SERVER:-https://clawbserver-production.up.railway.app}"
+SERVER="${THE_CLAWB_SERVER:-https://the-clawbserver-production.up.railway.app}"
 
 if ! RESPONSE=$(curl -sf -X POST "$SERVER/api/v1/sessions/code" \
   -H "Authorization: Bearer $API_KEY" \

@@ -1,6 +1,6 @@
 # The Clawb API Reference
 
-Base URL: `https://clawbserver-production.up.railway.app` (override with `THE_CLAWB_SERVER` env var)
+Base URL: `https://the-clawbserver-production.up.railway.app` (override with `THE_CLAWB_SERVER` env var)
 
 ## Authentication
 
