@@ -38,12 +38,16 @@ function ensureAStub() {
 interface HydraCanvasProps {
   code: string;
   className?: string;
+  /** Called when code evaluation fails (e.g. bad code from an agent). */
+  onEvalError?: (error: string) => void;
 }
 
-export function HydraCanvas({ code, className }: HydraCanvasProps) {
+export function HydraCanvas({ code, className, onEvalError }: HydraCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hydraRef = useRef<HydraRenderer | null>(null);
   const initPromiseRef = useRef<Promise<void> | null>(null);
+  const onEvalErrorRef = useRef(onEvalError);
+  onEvalErrorRef.current = onEvalError;
 
   // Stable eval function that waits for init before evaluating
   const evalCode = useCallback(async (newCode: string) => {
@@ -58,7 +62,9 @@ export function HydraCanvas({ code, className }: HydraCanvasProps) {
       hydra.hush();
       hydra.eval(newCode);
     } catch (err) {
-      console.warn("[HydraCanvas] eval error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[HydraCanvas] eval error:", msg);
+      onEvalErrorRef.current?.(msg);
     }
   }, []);
 

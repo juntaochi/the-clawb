@@ -9,6 +9,7 @@ import { ChatPanel } from "./chat-panel";
 import { StatusBar } from "./status-bar";
 import { useClubSocket } from "../hooks/use-club-socket";
 import { useStrudelAudioBridge } from "../hooks/use-strudel-audio-bridge";
+import { getAudienceSocket } from "../lib/socket";
 
 export function Dashboard() {
   const {
@@ -33,6 +34,9 @@ export function Dashboard() {
       <HydraCanvas
         code={vjCode}
         className="fixed inset-0 w-screen h-screen z-0"
+        onEvalError={(error) => {
+          getAudienceSocket().emit("code:error", { type: "vj", error });
+        }}
       />
 
       {/* UI overlay — text/UI elements have dark backdrop, rest is transparent */}
@@ -78,7 +82,13 @@ export function Dashboard() {
       </div>
 
       {/* Strudel audio engine (invisible, positioned fixed) */}
-      <StrudelPlayer code={djCode} onReady={handleStrudelReady} />
+      <StrudelPlayer
+        code={djCode}
+        onReady={handleStrudelReady}
+        onEvalError={(error) => {
+          getAudienceSocket().emit("code:error", { type: "dj", error });
+        }}
+      />
     </div>
   );
 }

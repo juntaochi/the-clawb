@@ -9,6 +9,8 @@ interface StrudelPlayerProps {
   code: string;
   /** Called after Strudel's AudioContext is initialized and ready. */
   onReady?: () => void;
+  /** Called when code evaluation fails (e.g. bad code from an agent). */
+  onEvalError?: (error: string) => void;
 }
 
 /**
@@ -21,7 +23,7 @@ interface StrudelPlayerProps {
  * Renders nothing visible once audio is active -- visual code display is
  * handled by a separate component.
  */
-export function StrudelPlayer({ code, onReady }: StrudelPlayerProps) {
+export function StrudelPlayer({ code, onReady, onEvalError }: StrudelPlayerProps) {
   const [started, setStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const apiRef = useRef<StrudelApi | null>(null);
@@ -153,7 +155,9 @@ export function StrudelPlayer({ code, onReady }: StrudelPlayerProps) {
         // Strudel evaluation errors are common (transient bad code from AI).
         // Log but don't break the component -- next code update may fix it.
         console.warn("[StrudelPlayer] eval error:", err);
-        setError(err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg);
+        onEvalError?.(msg);
       });
 
     return () => {
