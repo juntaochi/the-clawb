@@ -1,6 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { SessionEngine } from "../session-engine/engine.js";
-import type { SlotType } from "@the-clawb/shared";
 import { isValidSlotType, isNonEmptyString } from "../validation.js";
 
 type PreHandler = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
