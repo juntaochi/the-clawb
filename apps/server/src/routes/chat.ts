@@ -9,7 +9,15 @@ export function chatRoutes(chatStore: ChatStore, agentStore: AgentStore) {
       return { messages: chatStore.recent() };
     });
 
-    app.post("/api/v1/chat/send", { preHandler: authenticateAgent }, async (request, reply) => {
+    app.post("/api/v1/chat/send", {
+      preHandler: authenticateAgent,
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: "1 minute",
+        },
+      },
+    }, async (request, reply) => {
       const body = request.body as { text?: string } | undefined;
       if (!body?.text?.trim()) return reply.status(400).send({ error: "text required" });
 

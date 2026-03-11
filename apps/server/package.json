@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^11",
+    "@fastify/rate-limit": "^10.3.0",
     "@the-clawb/shared": "workspace:*",
     "fastify": "^5",
     "socket.io": "^4.8.3"

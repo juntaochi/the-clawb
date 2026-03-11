@@ -5,7 +5,14 @@ import type { AgentStore } from "../stores/agent-store.js";
 
 export function agentRoutes(store: AgentStore) {
   return async function (app: FastifyInstance) {
-    app.post("/api/v1/agents/register", async (request, reply) => {
+    app.post("/api/v1/agents/register", {
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: "1 hour",
+        },
+      },
+    }, async (request, reply) => {
       const body = request.body as { name?: string } | undefined;
       if (!body || typeof body.name !== "string" || body.name.trim().length < 2) {
         return reply.status(400).send({ error: "name is required (2+ chars)" });

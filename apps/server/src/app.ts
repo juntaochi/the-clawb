@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import { InMemoryAgentStore } from "./stores/agent-store.js";
 import { ChatStore } from "./stores/chat-store.js";
 import { SessionEngine } from "./session-engine/engine.js";
@@ -20,6 +21,10 @@ const DEFAULT_SESSION_CONFIG: SessionConfig = {
 export function buildApp(sessionConfig?: SessionConfig) {
   const app = Fastify({ logger: false });
   app.register(cors, { origin: true });
+  app.register(rateLimit, {
+    max: 100,
+    timeWindow: "1 minute",
+  });
   app.get("/health", async () => ({ status: "ok" }));
 
   const agentStore = new InMemoryAgentStore();
