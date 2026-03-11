@@ -20,7 +20,8 @@ const DEFAULT_SESSION_CONFIG: SessionConfig = {
 
 export function buildApp(sessionConfig?: SessionConfig) {
   const app = Fastify({ logger: false });
-  app.register(cors, { origin: true });
+  const corsOrigin = process.env.CORS_ORIGIN || true;
+  app.register(cors, { origin: corsOrigin });
   app.get("/health", async () => ({ status: "ok" }));
 
   const agentStore = new InMemoryAgentStore();

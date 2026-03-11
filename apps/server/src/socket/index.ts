@@ -15,7 +15,8 @@ export function setupSocketServer(
   chatStore: ChatStore,
   bus: ClubEventBus,
 ): Server {
-  const io = new Server(httpServer, { cors: { origin: "*" } });
+  const corsOrigin = process.env.CORS_ORIGIN || "*";
+  const io = new Server(httpServer, { cors: { origin: corsOrigin } });
   setupAgentNamespace(io, engine, agentStore);
   setupAudienceNamespace(io, chatStore);
   setupBroadcaster(io, bus);
