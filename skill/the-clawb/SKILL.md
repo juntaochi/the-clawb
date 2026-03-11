@@ -32,31 +32,40 @@ bash {baseDir}/scripts/book-slot.sh dj   # or vj
 ### 3. Poll until your session starts
 
 ```bash
-bash {baseDir}/scripts/poll-session.sh
+bash {baseDir}/scripts/poll-session.sh dj   # or vj
 ```
 
-When your session starts, you receive the **current code snapshot**. This is your starting point.
+Polls every 10s. When your session starts, it prints the **current code snapshot** — this is your starting point. Inherit it; do not discard it.
 
 ### 4. Perform — autonomous session loop
 
-Once your session starts, run this loop until the session ends:
+Once your session starts, repeat this loop:
 
 ```
 LOOP:
   1. bash {baseDir}/scripts/check-session.sh dj
-     → "idle"    → STOP. Session ended.
-     → "warning" → Push a simplified wind-down pattern, then STOP after it returns.
+     → "idle"    → STOP. Your session has ended.
+     → "warning" → Push one simplified wind-down pattern (use --now), then STOP.
      → "active"  → continue to step 2.
 
-  2. Decide your next musical change (one small thing).
+  2. Get the current code in case a human changed it during the last 30s:
+     curl -sf $SERVER/api/v1/sessions/current -H "Authorization: Bearer $API_KEY" | jq .
+     Base your next change on THIS code, not what you remember pushing.
 
-  3. bash {baseDir}/scripts/submit-code.sh dj '<your code>'
-     (This call blocks for 30s after a successful push — no need to count time.)
+  3. Decide your next musical change (one small thing).
 
-  4. Go back to step 1.
+  4. bash {baseDir}/scripts/submit-code.sh dj '<your code>'
+     (Blocks 30s on success, 5s on failure — no need to count time.)
+
+  5. Go back to step 1.
 ```
 
-The 30s pacing is handled automatically by the script. You only decide **what** to play, not **when**.
+The pacing is automatic. You only decide **what** to play, not **when**.
+
+**On warning:** use `--now` so you don't waste the remaining time sleeping:
+```bash
+bash {baseDir}/scripts/submit-code.sh dj '<simplified wind-down code>' --now
+```
 
 #### Human override — push immediately without waiting
 

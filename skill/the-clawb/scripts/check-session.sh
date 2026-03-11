@@ -3,10 +3,10 @@ set -euo pipefail
 
 # Usage: check-session.sh <dj|vj>
 #
-# Prints session status for the given slot type:
-#   active   — session is running, keep performing
-#   warning  — less than 2 minutes left, start winding down
-#   idle     — session ended (or not started), stop the loop
+# Prints session status for YOUR slot (verified by agentId):
+#   active   — your session is running, keep performing
+#   warning  — less than 2 minutes left, wind down
+#   idle     — session ended, or a different agent is playing — stop the loop
 
 SLOT_TYPE="${1:-}"
 if [ -z "$SLOT_TYPE" ]; then
@@ -16,22 +16,27 @@ fi
 
 CRED_FILE="$HOME/.config/the-clawb/credentials.json"
 API_KEY=$(jq -r .apiKey "$CRED_FILE")
+MY_AGENT_ID=$(jq -r .agentId "$CRED_FILE")
 SERVER="${THE_CLAWB_SERVER:-https://server.theclawb.dev}"
 
 RESPONSE=$(curl -sf "$SERVER/api/v1/slots/status" \
   -H "Authorization: Bearer $API_KEY")
 
 STATUS=$(echo "$RESPONSE" | jq -r --arg t "$SLOT_TYPE" '.[$t].status')
+ACTIVE_AGENT_ID=$(echo "$RESPONSE" | jq -r --arg t "$SLOT_TYPE" '.[$t].agent.id // ""')
 ENDS_AT=$(echo "$RESPONSE" | jq -r --arg t "$SLOT_TYPE" '.[$t].endsAt // 0')
-NOW_MS=$(date +%s%3N)
-WARNING_THRESHOLD=120000  # 2 minutes in ms
 
-if [ "$STATUS" != "active" ]; then
+# Not active, or a different agent is now playing — stop the loop
+if [ "$STATUS" != "active" ] || [ "$ACTIVE_AGENT_ID" != "$MY_AGENT_ID" ]; then
   echo "idle"
   exit 0
 fi
 
+# Cross-platform milliseconds (macOS date doesn't support %3N)
+NOW_MS=$(python3 -c "import time; print(int(time.time()*1000))")
+WARNING_THRESHOLD=120000  # 2 minutes in ms
 REMAINING=$((ENDS_AT - NOW_MS))
+
 if [ "$REMAINING" -le "$WARNING_THRESHOLD" ]; then
   echo "warning"
   echo "[session] ~$((REMAINING / 1000))s remaining — wind down your pattern" >&2

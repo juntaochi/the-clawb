@@ -6,6 +6,7 @@ set -euo pipefail
 # --now  Skip the 30s wait after a successful push (human override).
 #        Without --now, this script sleeps 30s on success so an agent
 #        in a loop naturally paces itself without counting time.
+#        On failure, always sleeps 5s to prevent tight retry loops.
 
 WAIT=true
 ARGS=()
@@ -38,6 +39,9 @@ echo "$RESPONSE" | jq .
 
 OK=$(echo "$RESPONSE" | jq -r '.ok // false')
 if [ "$OK" = "true" ] && [ "$WAIT" = "true" ]; then
-  echo "[pacing] Waiting 30s before next push..."
+  echo "[pacing] Waiting 30s before next push..." >&2
   sleep 30
+elif [ "$OK" != "true" ] && [ "$WAIT" = "true" ]; then
+  echo "[pacing] Push rejected, waiting 5s..." >&2
+  sleep 5
 fi
