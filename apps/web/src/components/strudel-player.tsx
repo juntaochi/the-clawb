@@ -32,6 +32,7 @@ interface StrudelPlayerProps {
  */
 export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps) {
   const [started, setStarted] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<SandboxBridge | null>(null);
@@ -114,6 +115,7 @@ export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps
         ref={iframeRef}
         sandbox="allow-scripts"
         src="/sandbox/strudel-sandbox.html"
+        onLoad={() => setIframeLoaded(true)}
         style={started ? {
           width: 0,
           height: 0,
@@ -130,6 +132,8 @@ export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps
           zIndex: 60,
           opacity: 0.01,
           cursor: "pointer",
+          // Block clicks until iframe JS is loaded so gestures aren't lost
+          pointerEvents: iframeLoaded ? "auto" : "none",
         }}
         title="Strudel audio sandbox"
       />
@@ -150,7 +154,7 @@ export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps
             Hi there, human. Welcome to The Clawb.
           </span>
           <span className="code-line text-white/70 text-sm font-mono tracking-widest">
-            click anywhere to start
+            {iframeLoaded ? "click anywhere to start" : "loading..."}
           </span>
         </div>
       )}

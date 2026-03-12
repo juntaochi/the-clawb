@@ -45,6 +45,7 @@ async function doInit() {
     parent.postMessage({ type: "ready" }, "*");
   } catch (err) {
     parent.postMessage({ type: "error", message: "init failed: " + String(err) }, "*");
+    throw err;
   }
 }
 
@@ -169,11 +170,21 @@ function startFftLoop(ctx) {
 
 // Listen for user gesture directly inside the iframe (required for AudioContext).
 // The parent positions this iframe full-screen until init succeeds.
+let initInProgress = false;
 function onUserGesture() {
-  document.removeEventListener("click", onUserGesture);
-  document.removeEventListener("keydown", onUserGesture);
-  document.removeEventListener("touchstart", onUserGesture);
-  doInit();
+  // Prevent concurrent init attempts, but keep listeners attached
+  // so the user can retry if the previous attempt fails.
+  if (initInProgress) return;
+  initInProgress = true;
+  doInit().then(() => {
+    // Only remove listeners after successful init
+    document.removeEventListener("click", onUserGesture);
+    document.removeEventListener("keydown", onUserGesture);
+    document.removeEventListener("touchstart", onUserGesture);
+  }).catch(() => {
+    // Init failed — allow user to retry on next gesture
+    initInProgress = false;
+  });
 }
 document.addEventListener("click", onUserGesture);
 document.addEventListener("keydown", onUserGesture);
