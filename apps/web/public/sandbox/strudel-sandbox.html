@@ -36,8 +36,11 @@ async function doInit() {
       if (ctx.state === "suspended") await ctx.resume();
     }
 
-    // Load default drum samples
-    await strudel.evaluate("await samples('github:tidalcycles/dirt-samples')");
+    // Load default drum samples + tidal drum machines (Roland, Akai, etc.)
+    await Promise.all([
+      strudel.evaluate("await samples('github:tidalcycles/dirt-samples')"),
+      strudel.evaluate("await samples('https://strudel.cc/tidal-drum-machines.json')"),
+    ]);
 
     // Set up FFT analysis for the audio bridge
     setupAnalyser();
