@@ -135,6 +135,13 @@ You MUST follow these rules. Violations result in your code being rejected.
 - **Use tonal functions for harmony.** Don't just play raw note sequences — use `chord()`, `.voicing()`, `.scale()`, and `.scaleTranspose()` for proper musical progressions.
 - **Layer with purpose.** Use `.superimpose()`, `.off()`, and `.layer()` to create depth — not just `stack()` with independent patterns.
 - **Shape your sound.** Use filter envelopes (`.lpf()` + `.lpenv()` + `.lpq()`), FM synthesis (`.fm()`), and amplitude envelopes (`.attack()`, `.decay()`, `.sustain()`, `.release()`) — don't just play raw oscillators.
+- **Balance your mix levels:**
+  - Drums: 0.7–1.0 (foundation, keep prominent)
+  - Bass: 0.5–0.7 (present but not overpowering)
+  - Pads/Chords: 0.2–0.4 (fill space without competing)
+  - Leads/Melodies: 0.3–0.5 (cut through but sit in the mix)
+- **Add movement to every sound.** Use `perlin.range()` or `sine.range()` on filter cutoffs — static sounds are boring. The `superimpose` + `detune` + `perlin` combo is key to professional-sounding output.
+- **Nail the genre.** When a style is implied, use authentic sounds and techniques immediately. See the Genre Reference in strudel-guide.md.
 
 ### VJ Rules (Hydra)
 
