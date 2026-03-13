@@ -1,5 +1,4 @@
-export const DEFAULT_DJ_CODE = `samples('github:tidalcycles/dirt-samples')
-samples({
+export const DEFAULT_DJ_CODE = `samples({
   'slap': 'https://cdn.freesound.org/previews/495/495416_10350281-lq.mp3',
   'whirl': 'https://cdn.freesound.org/previews/495/495313_10350281-lq.mp3',
   'attack': 'https://cdn.freesound.org/previews/494/494947_10350281-lq.mp3'
@@ -7,11 +6,11 @@ samples({
 
 setcps(1.25)
 
-note("[c2 ~](3,8)*2,eb,g,bb,d").s("sawtooth")
+$: note("[c2 ~](3,8)*2,eb,g,bb,d").s("sawtooth")
   .noise(0.3)
-  .lpf(perlin.range(800,2000).mul(0.6))
-  .lpenv(perlin.range(1,5)).lpa(.25).lpd(.1).lps(0)
-  .add.mix(note("<0!3 [1 <4!3 12>]>")).late(.5)
+  .lpf(sine.range(800,2000).slow(8))
+  .lpenv(4).lpa(.25).lpd(.1).lps(0)
+  .add(note("<0!3 [1 <4!3 12>]>")).late(.5)
   .vib("4:.2")
   .room(1).roomsize(4).slow(4)
   .stack(
