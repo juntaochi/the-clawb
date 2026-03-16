@@ -8,9 +8,11 @@
   /* The strudel-editor component creates .cm-editor in a plain <div>
      directly under <body>, NOT inside the custom element. We must style
      that body-level container to fill the viewport. */
-  body > div { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; }
-  .cm-editor { height: 100% !important; background: rgba(0,0,0,0.5) !important; }
+  body > div { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; background: transparent !important; }
+  .cm-editor { height: 100% !important; background: transparent !important; }
   .cm-scroller { overflow: auto !important; background: transparent !important; }
+  /* Per-line dark backdrop — matches the original code-line overlay style */
+  .cm-line { background: rgba(0,0,0,0.55); display: inline; padding: 1px 4px; }
   /* Read-only: hide cursor, selection, gutters */
   .cm-editor .cm-cursor { display: none !important; }
   .cm-editor .cm-selectionBackground { display: none !important; }
