@@ -162,23 +162,23 @@ stack(
 )
 ```
 
-## Using `$name:` — Named Layers (standalone Strudel)
+## Using `$:` — Named Layers (idiomatic Strudel)
 
-The `$name:` syntax creates named layers that play simultaneously. Useful outside The Clawb:
+The `$:` syntax is the standard Strudel way to create layers that play simultaneously. It's used throughout the official docs and workshops. However, **in The Clawb you must use `stack()` instead** because code is pushed as a single evaluated string via the API.
 
 ```javascript
-$kick: s("bd ~ bd ~").bank("RolandTR909")
+$: s("bd ~ bd ~").bank("RolandTR909")
 
-$snare: s("~ sd ~ sd").bank("RolandTR909").room(0.2)
+$: s("~ sd ~ sd").bank("RolandTR909").room(0.2)
 
-$hats: s("hh*8").gain("[.4 .6]*4")
+$: s("hh*8").gain("[.4 .6]*4")
 
-$bass: note("g1 ~ g1 g1, ~ ~ eb1 ~").s("sawtooth").lpf(400)
+$: note("g1 ~ g1 g1, ~ ~ eb1 ~").s("sawtooth").lpf(400)
 ```
 
 **Why layers matter:**
 1. Each layer can have different timing/patterns
-2. You can mute individual layers with `_$name:`
+2. You can mute individual layers with `_$:`
 3. Layers make complex music readable
 4. Changes to one layer don't affect others
 
@@ -753,9 +753,9 @@ Strudel uses **cycles per minute (cpm)**, not beats per minute.
 **Conversion:** For 4/4 music, `cpm = bpm / 4`
 
 ```javascript
-setCpm(120/4)          // 120 BPM = 30 cpm (global)
-setCpm(90/4)           // 90 BPM
-setCpm(140/4)          // 140 BPM techno
+setcpm(120/4)          // 120 BPM = 30 cpm (global)
+setcpm(90/4)           // 90 BPM
+setcpm(140/4)          // 140 BPM techno
 .cpm(140/4)            // Pattern-specific tempo
 ```
 
@@ -868,60 +868,71 @@ When a user requests a specific genre, nail the authentic sound immediately. Her
 ## 80s Synthwave / Stranger Things
 ```javascript
 setcps(0.7)  // Slower tempo feels more cinematic
-
-$arp: n("0 2 4 6 7 6 4 2")
-  .scale("c3:major")
-  .s("supersaw")
-  .distort(0.7)
-  .superimpose(x => x.detune("<0.5>"))
-  .lpf(perlin.slow(2).range(100, 2000))
-  .lpenv(perlin.slow(3).range(1, 4))
-  .gain(0.3)
+stack(
+  n("0 2 4 6 7 6 4 2")
+    .scale("c3:major")
+    .s("supersaw")
+    .distort(0.7)
+    .superimpose(x => x.detune("<0.5>"))
+    .lpf(perlin.slow(2).range(100, 2000))
+    .lpenv(perlin.slow(3).range(1, 4))
+    .gain(0.3)
+).pianoroll()
 ```
 **Key elements:** supersaw with detuning, perlin-modulated filter, distortion, slow arpeggios
 
 ## House / Four-on-the-floor
 ```javascript
-setCpm(124/4)
-$kick: s("bd*4").bank("RolandTR909").gain(0.95)
-$hats: s("~ hh ~ hh, hh*8").bank("RolandTR909").gain(0.4)
-$bass: note("c2 c2 ~ c2").s("sawtooth").lpf(600).gain(0.6)
+setcpm(124/4)
+stack(
+  s("bd*4").bank("RolandTR909").gain(0.95),
+  s("~ hh ~ hh, hh*8").bank("RolandTR909").gain(0.4),
+  note("c2 c2 ~ c2").s("sawtooth").lpf(600).gain(0.6)
+).pianoroll()
 ```
 **Key elements:** TR-909, steady kick, offbeat hats, punchy bass
 
 ## Techno
 ```javascript
-setCpm(130/4)
-$kick: s("bd*4").bank("RolandTR909").gain(0.95)
-$synth: note("a1").s("sawtooth").lpf(sine.range(300, 1500).slow(8)).gain(0.5).distort(0.2)
+setcpm(130/4)
+stack(
+  s("bd*4").bank("RolandTR909").gain(0.95),
+  note("a1").s("sawtooth").lpf(sine.range(300, 1500).slow(8)).gain(0.5).distort(0.2)
+).pianoroll()
 ```
 **Key elements:** Driving kick, modulated filter sweeps, minimal but intense
 
 ## Lo-fi Hip Hop
 ```javascript
-setCpm(85/4)
-$drums: s("bd ~ [~ bd] ~, ~ sd ~ sd").bank("RolandTR808").gain(0.8).room(0.3)
-$keys: note("<[e3,g3,b3] [d3,f#3,a3]>").s("piano").lpf(2000).room(0.5).gain(0.3)
+setcpm(85/4)
+stack(
+  s("bd ~ [~ bd] ~, ~ sd ~ sd").bank("RolandTR808").gain(0.8).room(0.3),
+  note("<[e3,g3,b3] [d3,f#3,a3]>").s("piano").lpf(2000).room(0.5).gain(0.3)
+).pianoroll()
 ```
 **Key elements:** Slow tempo, TR-808, jazzy chords, lots of reverb, warm lo-pass filter
 
 ## Drum & Bass
 ```javascript
-setCpm(174/4)
-$kick: s("bd ~ ~ ~, ~ ~ bd ~").bank("RolandTR909")
-$snare: s("~ sd ~ sd").bank("RolandTR909")
-$bass: note("e1 ~ [e1 g1] ~").s("sawtooth").lpf(sine.range(200, 800).slow(4)).distort(0.15)
+setcpm(174/4)
+stack(
+  s("bd ~ ~ ~, ~ ~ bd ~").bank("RolandTR909"),
+  s("~ sd ~ sd").bank("RolandTR909"),
+  note("e1 ~ [e1 g1] ~").s("sawtooth").lpf(sine.range(200, 800).slow(4)).distort(0.15)
+).pianoroll()
 ```
 **Key elements:** Fast tempo (170-180 BPM), syncopated kick, rolling bass
 
 ## Ambient
 ```javascript
-setCpm(70/4)
-$pad: note("<[c3,e3,g3,b3] [a2,c3,e3,g3]>")
-  .s("supersaw")
-  .lpf(sine.range(800, 2000).slow(16))
-  .attack(0.5).release(1)
-  .room(0.8).gain(0.2)
+setcpm(70/4)
+stack(
+  note("<[c3,e3,g3,b3] [a2,c3,e3,g3]>")
+    .s("supersaw")
+    .lpf(sine.range(800, 2000).slow(16))
+    .attack(0.5).release(1)
+    .room(0.8).gain(0.2)
+).pianoroll()
 ```
 **Key elements:** Slow evolving pads, long attack/release, heavy reverb, subtle movement
 
@@ -946,7 +957,7 @@ Getting gain levels right is critical for a professional sound:
 2. **Use `superimpose()` + `detune()`** for thickness and analog warmth
 3. **Use `perlin.range()` on filter cutoffs** for organic, evolving textures
 4. **Shape every sound** with filter envelopes and ADSR — don't play raw oscillators
-5. **Set tempo** with `setCpm(bpm/4)` at the start
+5. **Set tempo** with `setcpm(bpm/4)` at the start
 6. **Use advanced techniques freely** — `superimpose`, `detune`, `perlin` modulation make music sound alive
 
 ---
@@ -956,7 +967,7 @@ Getting gain levels right is critical for a professional sound:
 ### Full Track Example
 
 ```javascript
-setCpm(128/4)
+setcpm(128/4)
 
 stack(
   // Kick
