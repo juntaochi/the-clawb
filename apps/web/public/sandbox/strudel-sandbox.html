@@ -5,13 +5,22 @@
 <style>
   * { margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
-  /* Show strudel-editor canvas (pianoroll etc.) but hide the CodeMirror code editor.
-     The parent app renders its own code panel on top. */
+  /* Full strudel-editor: code + inline visualization (pianoroll, scope, pitchwheel).
+     CodeMirror is visible (read-only), visualizations render interleaved with code
+     exactly like strudel.cc. */
   strudel-editor { display: block; width: 100%; height: 100%; background: transparent; }
-  /* Hide CodeMirror editor — all .cm- elements */
-  .cm-editor, .cm-scroller, .cm-content { display: none !important; }
-  /* Hide any play/stop buttons the component renders */
+  /* Make editor read-only — code is controlled by the parent via postMessage */
+  .cm-editor { background: transparent !important; }
+  .cm-editor .cm-cursor { display: none !important; }
+  .cm-editor .cm-selectionBackground { display: none !important; }
+  .cm-editor .cm-activeLineGutter, .cm-editor .cm-activeLine { background: transparent !important; }
+  .cm-editor .cm-gutters { display: none !important; }
+  .cm-scroller { overflow: auto !important; }
+  .cm-content { caret-color: transparent !important; }
+  /* Hide play/stop/settings buttons */
   button { display: none !important; }
+  /* Transparent background so Hydra shows through */
+  .cm-editor .cm-scroller { background: transparent !important; }
 </style>
 </head>
 <body>

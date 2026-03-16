@@ -50,12 +50,14 @@ export function Dashboard() {
       {/* UI overlay — text/UI elements have dark backdrop, rest is transparent */}
       <div className="relative z-10 flex flex-col h-full">
         <Group orientation="horizontal" className="flex-1">
-          {/* Left: DJ code + scope */}
+          {/* Left: DJ strudel-editor (code + inline visualizations) + scope */}
           <Panel defaultSize={65} minSize={30}>
             <div className="flex flex-col h-full">
-              <div className="flex-1 min-h-0">
-                <CodePanel code={djCode} label="DJ (Strudel)" />
-              </div>
+              <StrudelPlayer
+                code={djCode}
+                onAudioData={handleAudioData}
+                className="flex-1 min-h-0 relative"
+              />
               <StrudelScope
                 scopeData={scopeData}
                 freqData={freqData}
@@ -91,11 +93,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Strudel audio engine (invisible sandboxed iframe) */}
-      <StrudelPlayer
-        code={djCode}
-        onAudioData={handleAudioData}
-      />
+      {/* StrudelPlayer is now rendered inline in the left panel above */}
     </div>
   );
 }

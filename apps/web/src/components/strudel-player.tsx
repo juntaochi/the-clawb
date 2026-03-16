@@ -14,6 +14,8 @@ interface StrudelPlayerProps {
    * arrives via postMessage from the sandboxed iframe.
    */
   onAudioData?: (data: { fft: number[]; scope: number[]; freq: number[] }) => void;
+  /** CSS class for the container when started (iframe fills this area). */
+  className?: string;
 }
 
 /**
@@ -30,7 +32,7 @@ interface StrudelPlayerProps {
  * Renders nothing visible once audio is active -- visual code display is
  * handled by a separate component.
  */
-export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps) {
+export function StrudelPlayer({ code, onReady, onAudioData, className }: StrudelPlayerProps) {
   const [started, setStarted] = useState(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,40 +109,26 @@ export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps
 
   return (
     <>
-      {/* Sandboxed iframe running the Strudel audio engine.
-          Before init: full-screen + transparent so user click goes to the iframe
-          (AudioContext requires a user gesture in its own browsing context).
-          After init: hidden off-screen since audio plays without visuals. */}
-      <iframe
-        ref={iframeRef}
-        sandbox="allow-scripts"
-        src="/sandbox/strudel-sandbox.html"
-        onLoad={() => setIframeLoaded(true)}
-        style={started ? {
-          // After init: fullscreen between Hydra (z-0) and UI (z-10).
-          // Shows pianoroll/visualization canvas, transparent background.
-          position: "fixed",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          border: "none",
-          zIndex: 5,
-          pointerEvents: "none",
-          background: "transparent",
-        } : {
-          // Before init: fullscreen + nearly transparent to capture user gesture
-          position: "fixed",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          border: "none",
-          zIndex: 60,
-          opacity: 0.01,
-          cursor: "pointer",
-          pointerEvents: iframeLoaded ? "auto" : "none",
-        }}
-        title="Strudel audio sandbox"
-      />
+      {/* Single iframe — repositioned based on state, never remounted.
+          Before init: fullscreen invisible overlay to capture user gesture.
+          After init: fills the className container, showing code + visualizations. */}
+      <div className={started ? className : "fixed inset-0 z-[60]"}>
+        <iframe
+          ref={iframeRef}
+          sandbox="allow-scripts"
+          src="/sandbox/strudel-sandbox.html"
+          onLoad={() => setIframeLoaded(true)}
+          className="w-full h-full border-none"
+          style={started ? {
+            background: "transparent",
+          } : {
+            opacity: 0.01,
+            cursor: "pointer",
+            pointerEvents: iframeLoaded ? "auto" : "none",
+          }}
+          title="Strudel audio sandbox"
+        />
+      </div>
 
       {started ? (
         error ? (
