@@ -53,6 +53,19 @@ async function doInit() {
         const ts = "https://raw.githubusercontent.com/todepond/samples/main";
         const tc = "https://raw.githubusercontent.com/tidalcycles/uzu-drumkit/main";
 
+        // Register no-op stubs for ALL @strudel/draw visualization methods
+        // FIRST, unconditionally. This guarantees code using .pianoroll(),
+        // ._pitchwheel(), .color() etc. never throws, regardless of whether
+        // @strudel/draw loads. If draw loads later, it overwrites these stubs.
+        if (strudel.Pattern) {
+          const noop = function() { return this; };
+          ["pianoroll","_pianoroll","scope","_scope","punchcard","_punchcard",
+           "spiral","_spiral","wordfall","_wordfall","pitchwheel","_pitchwheel",
+           "draw","animate","onPaint","getPainters","color"].forEach(m => {
+            strudel.Pattern.prototype[m] = noop;
+          });
+        }
+
         // GM soundfonts — try import map + ?external first (single core instance),
         // fall back to ?bundle-deps (duplicate core, but audio still works).
         const sfPromise = import("https://esm.sh/@strudel/soundfonts@1.3.0?external=@strudel/core,@strudel/webaudio")
@@ -60,20 +73,10 @@ async function doInit() {
           .then(({ registerSoundfonts }) => registerSoundfonts())
           .catch(err => console.warn("[StrudelSandbox] soundfonts unavailable:", err));
 
-        // @strudel/draw — real visualization methods (pianoroll, scope, etc.)
-        // Non-blocking: if unavailable, register no-op stubs so code doesn't throw.
+        // Try to load real @strudel/draw (overwrites stubs above if successful).
+        // Non-blocking — if it fails, the stubs are already in place.
         const drawPromise = import("https://esm.sh/@strudel/draw@1.2.6?external=@strudel/core")
-          .catch(() => {
-            // Fallback: register no-op stubs for visualization methods
-            if (strudel.Pattern) {
-              const noop = function() { return this; };
-              ["pianoroll","_pianoroll","scope","_scope","punchcard","_punchcard",
-               "spiral","_spiral","wordfall","_wordfall","pitchwheel","_pitchwheel",
-               "draw","animate","onPaint","getPainters","color"].forEach(m => {
-                if (!strudel.Pattern.prototype[m]) strudel.Pattern.prototype[m] = noop;
-              });
-            }
-          });
+          .catch(err => console.warn("[StrudelSandbox] @strudel/draw unavailable:", err));
 
         await Promise.all([
           sfPromise,
