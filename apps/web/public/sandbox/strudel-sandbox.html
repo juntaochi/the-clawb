@@ -6,163 +6,110 @@
   * { margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
 </style>
-<!--
-  Import map: @strudel/web@1.3.0 ships with @strudel/core inlined.
-  Other @strudel packages (soundfonts, draw) import @strudel/core as a
-  separate module, creating a duplicate instance and a split registry.
-  This import map redirects bare specifiers so every package resolves to
-  the SAME core/webaudio that lives inside the @strudel/web bundle.
--->
-<script type="importmap">
-{
-  "imports": {
-    "@strudel/core": "https://esm.sh/@strudel/web@1.3.0/es2022/web.mjs",
-    "@strudel/webaudio": "https://esm.sh/@strudel/web@1.3.0/es2022/web.mjs"
-  }
-}
-</script>
 </head>
 <body>
-<script type="module">
+<!--
+  Shim localStorage/sessionStorage BEFORE loading any library.
+  sandbox="allow-scripts" (without allow-same-origin) blocks storage access.
+  The @strudel/repl bundle may reference localStorage for settings persistence.
+-->
+<script>
+try { localStorage.getItem("_"); } catch(e) {
+  var ns = { getItem:function(){return null}, setItem:function(){}, removeItem:function(){}, clear:function(){}, key:function(){return null}, length:0 };
+  Object.defineProperty(window, "localStorage", { value: ns, writable: false });
+  Object.defineProperty(window, "sessionStorage", { value: ns, writable: false });
+}
+</script>
+
+<!--
+  Load @strudel/repl as a single IIFE bundle from unpkg (2.2MB).
+  This is the SAME code that powers strudel.cc — it includes ALL sub-packages
+  (@strudel/core, @strudel/web, @strudel/draw, @strudel/soundfonts, @strudel/mini,
+  @strudel/tonal, @strudel/hydra, @strudel/midi, @strudel/codemirror) in ONE bundle.
+  Because everything is compiled into a single IIFE, there is exactly ONE instance
+  of @strudel/core — no duplicate registries, no import map hacks.
+  Exposes: window.strudel = { initStrudel, evaluate, hush, prebake, Pattern, ... }
+-->
+<script src="https://unpkg.com/@strudel/repl@1.3.0"></script>
+
+<script>
 // Strudel Sandbox — runs inside a sandboxed iframe (allow-scripts only).
-// No access to parent DOM, cookies, localStorage, or parent-origin fetch.
 // Communication is exclusively via postMessage.
 
 // FFT analysis constants — mirrors use-strudel-audio-bridge.ts
-const NUM_BINS = 5;
-const FFT_SIZE = 4096;
-// Logarithmic frequency boundaries for 5 bins (Hz):
-// [0] sub-bass 20-80  [1] bass 80-250  [2] low-mid 250-1k  [3] mid 1k-4k  [4] high 4k-20k
-const FREQ_EDGES = [20, 80, 250, 1000, 4000, 20000];
+var NUM_BINS = 5;
+var FFT_SIZE = 4096;
+var FREQ_EDGES = [20, 80, 250, 1000, 4000, 20000];
 
-let strudel = null;
-let analyser = null;
-let rafId = null;
+var analyser = null;
+var rafId = null;
+var isReady = false;
 
-async function doInit() {
+// The IIFE bundle exposes everything on window.strudel
+var S = window.strudel || {};
+
+function doInit() {
   try {
-    // Core engine — must succeed for audio to work.
-    strudel = await import("https://esm.sh/@strudel/web@1.3.0");
-
-    // initStrudel with a custom prebake that mirrors the official @strudel/repl.
-    // The prebake runs after the default (which registers synth oscillators).
-    await strudel.initStrudel({
-      prebake: async () => {
-        // GitHub raw URLs (all serve Access-Control-Allow-Origin: *)
-        const ds = "https://raw.githubusercontent.com/felixroos/dough-samples/main";
-        const ts = "https://raw.githubusercontent.com/todepond/samples/main";
-        const tc = "https://raw.githubusercontent.com/tidalcycles/uzu-drumkit/main";
-
-        // Register no-op stubs for ALL @strudel/draw visualization methods
-        // FIRST, unconditionally. This guarantees code using .pianoroll(),
-        // ._pitchwheel(), .color() etc. never throws, regardless of whether
-        // @strudel/draw loads. If draw loads later, it overwrites these stubs.
-        if (strudel.Pattern) {
-          const noop = function() { return this; };
-          ["pianoroll","_pianoroll","scope","_scope","punchcard","_punchcard",
-           "spiral","_spiral","wordfall","_wordfall","pitchwheel","_pitchwheel",
-           "draw","animate","onPaint","getPainters","color"].forEach(m => {
-            strudel.Pattern.prototype[m] = noop;
-          });
-        }
-
-        // GM soundfonts — try import map + ?external first (single core instance),
-        // fall back to ?bundle-deps (duplicate core, but audio still works).
-        const sfPromise = import("https://esm.sh/@strudel/soundfonts@1.3.0?external=@strudel/core,@strudel/webaudio")
-          .catch(() => import("https://esm.sh/@strudel/soundfonts@1.3.0?bundle-deps"))
-          .then(({ registerSoundfonts }) => registerSoundfonts())
-          .catch(err => console.warn("[StrudelSandbox] soundfonts unavailable:", err));
-
-        // Try to load real @strudel/draw (overwrites stubs above if successful).
-        // Non-blocking — if it fails, the stubs are already in place.
-        const drawPromise = import("https://esm.sh/@strudel/draw@1.2.6?external=@strudel/core")
-          .catch(err => console.warn("[StrudelSandbox] @strudel/draw unavailable:", err));
-
-        await Promise.all([
-          sfPromise,
-          drawPromise,
-          strudel.registerZZFXSounds(),
-          strudel.samples(`${ds}/tidal-drum-machines.json`),
-          strudel.samples(`${ds}/piano.json`),
-          strudel.samples("github:tidalcycles/dirt-samples"),
-          strudel.samples(`${ds}/vcsl.json`),
-          strudel.samples(`${ds}/mridangam.json`),
-          strudel.samples(`${tc}/strudel.json`),
-        ]);
-
-        // Load drum machine bank aliases (RolandTR808 → TR808, etc.)
-        strudel.aliasBank(`${ts}/tidal-drum-machines-alias.json`);
-
-        // Convenience method for piano sounds (matches strudel.cc REPL)
-        if (strudel.Pattern && !strudel.Pattern.prototype.piano) {
-          const maxPan = strudel.noteToMidi("C8");
-          strudel.Pattern.prototype.piano = function () {
-            return this.fmap((v) => ({ ...v, clip: v.clip ?? 1 }))
-              .s("piano").release(0.1)
-              .fmap((value) => {
-                const midi = strudel.valueToMidi(value);
-                const pan = Math.min(Math.round(midi) / maxPan, 1) * 0.5 + 0.25;
-                return { ...value, pan: (value.pan || 1) * pan };
-              });
-          };
-        }
-      },
-    });
-
-    // Ensure AudioContext is running
-    const getAudioContext = strudel.getAudioContext;
-    if (typeof getAudioContext === "function") {
-      const ctx = getAudioContext();
-      if (ctx.state === "suspended") await ctx.resume();
+    // initStrudel sets up AudioContext, superdough, default oscillators.
+    // The prebake from @strudel/repl loads all default sounds, soundfonts,
+    // draw methods, ZZFX, drum machines — exactly like strudel.cc.
+    var initFn = S.initStrudel || S.initstrudel;
+    if (!initFn) {
+      throw new Error("initStrudel not found on strudel global");
     }
 
-    // Set up FFT analysis for the audio bridge
-    setupAnalyser();
-
-    parent.postMessage({ type: "ready" }, "*");
+    return initFn({ prebake: S.prebake })
+      .then(function() {
+        // Ensure AudioContext is running
+        var getCtx = S.getAudioContext;
+        if (typeof getCtx === "function") {
+          var ctx = getCtx();
+          if (ctx.state === "suspended") return ctx.resume();
+        }
+      })
+      .then(function() {
+        setupAnalyser();
+        isReady = true;
+        parent.postMessage({ type: "ready" }, "*");
+      });
   } catch (err) {
     parent.postMessage({ type: "error", message: "init failed: " + String(err) }, "*");
-    throw err;
+    return Promise.reject(err);
   }
 }
 
 function setupAnalyser() {
   try {
-    const getAudioContext = strudel.getAudioContext;
-    const getController = strudel.getSuperdoughAudioController;
-
-    if (typeof getAudioContext !== "function" || typeof getController !== "function") {
-      console.warn("[StrudelSandbox] required Strudel exports not found for analyser");
+    var getCtx = S.getAudioContext;
+    var getCtrl = S.getSuperdoughAudioController;
+    if (typeof getCtx !== "function" || typeof getCtrl !== "function") {
+      console.warn("[StrudelSandbox] analyser exports not found");
       return;
     }
 
-    const ctx = getAudioContext();
+    var ctx = getCtx();
     analyser = ctx.createAnalyser();
     analyser.fftSize = FFT_SIZE;
     analyser.smoothingTimeConstant = 0.4;
 
-    // Connect to superdough's destinationGain
-    const controller = getController();
-    if (controller?.output?.destinationGain) {
-      controller.output.destinationGain.connect(analyser);
+    var ctrl = getCtrl();
+    if (ctrl && ctrl.output && ctrl.output.destinationGain) {
+      ctrl.output.destinationGain.connect(analyser);
     } else {
-      // Retry — the controller may not be fully wired until audio plays
-      let retries = 0;
-      const retryInterval = setInterval(() => {
+      var retries = 0;
+      var iv = setInterval(function() {
         retries++;
-        const ctrl = getController();
-        if (ctrl?.output?.destinationGain) {
-          ctrl.output.destinationGain.connect(analyser);
-          clearInterval(retryInterval);
+        var c = getCtrl();
+        if (c && c.output && c.output.destinationGain) {
+          c.output.destinationGain.connect(analyser);
+          clearInterval(iv);
           startFftLoop(ctx);
         } else if (retries >= 10) {
-          clearInterval(retryInterval);
-          console.warn("[StrudelSandbox] destinationGain not available after retries");
+          clearInterval(iv);
         }
       }, 200);
       return;
     }
-
     startFftLoop(ctx);
   } catch (err) {
     console.warn("[StrudelSandbox] analyser setup error:", err);
@@ -172,94 +119,62 @@ function setupAnalyser() {
 function startFftLoop(ctx) {
   if (rafId !== null || !analyser) return;
 
-  const bufferLength = analyser.frequencyBinCount;
-  const dataArray = new Float32Array(bufferLength);
-  const sampleRate = ctx.sampleRate;
-  const binHz = sampleRate / FFT_SIZE;
-
-  // Precompute FFT index ranges for each frequency band
-  const binRanges = [];
-  for (let i = 0; i < NUM_BINS; i++) {
-    const lo = Math.max(0, Math.round(FREQ_EDGES[i] / binHz));
-    const hi = Math.min(bufferLength - 1, Math.round(FREQ_EDGES[i + 1] / binHz));
-    binRanges.push([lo, hi]);
+  var bufLen = analyser.frequencyBinCount;
+  var dataArr = new Float32Array(bufLen);
+  var binHz = ctx.sampleRate / FFT_SIZE;
+  var binRanges = [];
+  for (var i = 0; i < NUM_BINS; i++) {
+    binRanges.push([
+      Math.max(0, Math.round(FREQ_EDGES[i] / binHz)),
+      Math.min(bufLen - 1, Math.round(FREQ_EDGES[i + 1] / binHz))
+    ]);
   }
-
-  const fft = new Float32Array(NUM_BINS);
-
-  // Also capture time-domain data for scope visualization
-  const timeData = new Float32Array(analyser.fftSize);
-
-  // Send FFT data to parent at ~30fps (every ~33ms) — not every rAF frame
-  let lastSend = 0;
-  const SEND_INTERVAL = 33;
-
-  // Downsample time-domain data for scope: send 512 samples instead of full fftSize
-  const SCOPE_SAMPLES = 512;
+  var fft = new Float32Array(NUM_BINS);
+  var timeData = new Float32Array(analyser.fftSize);
+  var lastSend = 0;
+  var SEND_IV = 33;
+  var SCOPE_N = 512;
 
   function loop() {
-    analyser.getFloatFrequencyData(dataArray);
-
-    for (let i = 0; i < NUM_BINS; i++) {
-      const [lo, hi] = binRanges[i];
-      let sum = 0;
-      const count = hi - lo + 1;
-      for (let j = lo; j <= hi; j++) {
-        sum += dataArray[j];
-      }
-      const avgDb = sum / count;
-      fft[i] = Math.max(0, Math.min(1, (avgDb + 70) / 60));
+    analyser.getFloatFrequencyData(dataArr);
+    for (var i = 0; i < NUM_BINS; i++) {
+      var lo = binRanges[i][0], hi = binRanges[i][1];
+      var sum = 0, cnt = hi - lo + 1;
+      for (var j = lo; j <= hi; j++) sum += dataArr[j];
+      fft[i] = Math.max(0, Math.min(1, (sum / cnt + 70) / 60));
     }
-
-    const now = performance.now();
-    if (now - lastSend >= SEND_INTERVAL) {
+    var now = performance.now();
+    if (now - lastSend >= SEND_IV) {
       lastSend = now;
-
-      // Time-domain data for scope — downsample to SCOPE_SAMPLES
       analyser.getFloatTimeDomainData(timeData);
-      const step = Math.floor(timeData.length / SCOPE_SAMPLES);
-      const scopeData = new Float32Array(SCOPE_SAMPLES);
-      for (let i = 0; i < SCOPE_SAMPLES; i++) {
-        scopeData[i] = timeData[i * step];
-      }
-
-      // Frequency data for scope — send raw freq data downsampled
-      const FREQ_SAMPLES = 256;
-      const freqStep = Math.floor(bufferLength / FREQ_SAMPLES);
-      const freqScopeData = new Float32Array(FREQ_SAMPLES);
-      for (let i = 0; i < FREQ_SAMPLES; i++) {
-        freqScopeData[i] = dataArray[i * freqStep];
-      }
-
+      var step = Math.floor(timeData.length / SCOPE_N);
+      var scope = new Float32Array(SCOPE_N);
+      for (var i = 0; i < SCOPE_N; i++) scope[i] = timeData[i * step];
+      var FN = 256, fStep = Math.floor(bufLen / FN);
+      var freq = new Float32Array(FN);
+      for (var i = 0; i < FN; i++) freq[i] = dataArr[i * fStep];
       parent.postMessage({
         type: "audio",
         fft: Array.from(fft),
-        scope: Array.from(scopeData),
-        freq: Array.from(freqScopeData),
+        scope: Array.from(scope),
+        freq: Array.from(freq),
       }, "*");
     }
-
     rafId = requestAnimationFrame(loop);
   }
-
   loop();
 }
 
-// Listen for user gesture directly inside the iframe (required for AudioContext).
-// The parent positions this iframe full-screen until init succeeds.
-let initInProgress = false;
+// User gesture to unlock AudioContext
+var initInProgress = false;
 function onUserGesture() {
-  // Prevent concurrent init attempts, but keep listeners attached
-  // so the user can retry if the previous attempt fails.
   if (initInProgress) return;
   initInProgress = true;
-  doInit().then(() => {
-    // Only remove listeners after successful init
+  doInit().then(function() {
     document.removeEventListener("click", onUserGesture);
     document.removeEventListener("keydown", onUserGesture);
     document.removeEventListener("touchstart", onUserGesture);
-  }).catch(() => {
-    // Init failed — allow user to retry on next gesture
+  })["catch"](function() {
     initInProgress = false;
   });
 }
@@ -267,46 +182,49 @@ document.addEventListener("click", onUserGesture);
 document.addEventListener("keydown", onUserGesture);
 document.addEventListener("touchstart", onUserGesture);
 
-window.addEventListener("message", (e) => {
-  const { type } = e.data || {};
+// postMessage bridge
+window.addEventListener("message", function(e) {
+  var d = e.data || {};
 
-  if (type === "init") {
-    // Also support postMessage init (for cases where gesture already captured)
+  if (d.type === "init") {
     doInit();
     return;
   }
 
-  if (type === "eval") {
-    const code = e.data.code;
-    if (!strudel) {
+  if (d.type === "eval") {
+    if (!isReady) {
       parent.postMessage({ type: "error", message: "not initialized" }, "*");
       return;
     }
-    strudel.evaluate(code)
-      .then(() => {
+    var evalFn = S.evaluate;
+    if (typeof evalFn !== "function") {
+      parent.postMessage({ type: "error", message: "evaluate not available" }, "*");
+      return;
+    }
+    evalFn(d.code)
+      .then(function() {
         parent.postMessage({ type: "ack" }, "*");
-        // If analyser isn't running yet, try to set it up now
-        // (first evaluate may have wired up destinationGain)
         if (!rafId && analyser) {
-          const ctx = strudel.getAudioContext();
-          const ctrl = strudel.getSuperdoughAudioController();
-          if (ctrl?.output?.destinationGain) {
-            try { ctrl.output.destinationGain.connect(analyser); } catch {}
+          var ctx = S.getAudioContext();
+          var ctrl = S.getSuperdoughAudioController();
+          if (ctrl && ctrl.output && ctrl.output.destinationGain) {
+            try { ctrl.output.destinationGain.connect(analyser); } catch(x){}
             startFftLoop(ctx);
           }
         } else if (!analyser) {
           setupAnalyser();
         }
       })
-      .catch((err) => {
+      ["catch"](function(err) {
         parent.postMessage({ type: "error", message: String(err) }, "*");
       });
     return;
   }
 
-  if (type === "hush") {
+  if (d.type === "hush") {
     try {
-      if (strudel) strudel.hush();
+      var hushFn = S.hush;
+      if (typeof hushFn === "function") hushFn();
       parent.postMessage({ type: "ack" }, "*");
     } catch (err) {
       parent.postMessage({ type: "error", message: String(err) }, "*");
