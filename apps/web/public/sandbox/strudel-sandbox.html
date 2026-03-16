@@ -5,13 +5,14 @@
 <style>
   * { margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  /* Hide the CodeMirror editor UI — code is controlled programmatically via postMessage */
+  strudel-editor { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; }
 </style>
 </head>
 <body>
 <!--
   Shim localStorage/sessionStorage BEFORE loading any library.
   sandbox="allow-scripts" (without allow-same-origin) blocks storage access.
-  The @strudel/repl bundle may reference localStorage for settings persistence.
 -->
 <script>
 try { localStorage.getItem("_"); } catch(e) {
@@ -22,103 +23,121 @@ try { localStorage.getItem("_"); } catch(e) {
 </script>
 
 <!--
-  Load @strudel/repl as a single IIFE bundle from unpkg (2.2MB).
-  This is the SAME code that powers strudel.cc — it includes ALL sub-packages
-  (@strudel/core, @strudel/web, @strudel/draw, @strudel/soundfonts, @strudel/mini,
-  @strudel/tonal, @strudel/hydra, @strudel/midi, @strudel/codemirror) in ONE bundle.
-  Because everything is compiled into a single IIFE, there is exactly ONE instance
-  of @strudel/core — no duplicate registries, no import map hacks.
-  Exposes: window.strudel = { initStrudel, evaluate, hush, prebake, Pattern, ... }
+  Load @strudel/repl IIFE bundle from unpkg (2.2MB).
+  Includes ALL sub-packages in ONE bundle with ONE @strudel/core instance.
+  Registers <strudel-editor> custom element.
 -->
 <script src="https://unpkg.com/@strudel/repl@1.3.0"></script>
 
+<!--
+  The <strudel-editor> web component handles everything:
+  - initStrudel + prebake (all sounds, soundfonts, draw, samples)
+  - AudioContext creation + user gesture handling (initAudioOnFirstClick)
+  - Code transpilation and evaluation
+  We hide the CodeMirror UI and control it programmatically.
+-->
+<strudel-editor id="repl">
+  <!--
+  // waiting for code
+  -->
+</strudel-editor>
+
 <script>
-// Strudel Sandbox — runs inside a sandboxed iframe (allow-scripts only).
-// Communication is exclusively via postMessage.
-
-// FFT analysis constants — mirrors use-strudel-audio-bridge.ts
-var NUM_BINS = 5;
-var FFT_SIZE = 4096;
-var FREQ_EDGES = [20, 80, 250, 1000, 4000, 20000];
-
+var repl = document.getElementById("repl");
 var analyser = null;
 var rafId = null;
 var isReady = false;
 
-// The IIFE bundle exposes everything on window.strudel
-var S = window.strudel || {};
+// FFT analysis constants
+var NUM_BINS = 5, FFT_SIZE = 4096;
+var FREQ_EDGES = [20, 80, 250, 1000, 4000, 20000];
 
-function doInit() {
-  try {
-    // initStrudel sets up AudioContext, superdough, default oscillators.
-    // The prebake from @strudel/repl loads all default sounds, soundfonts,
-    // draw methods, ZZFX, drum machines — exactly like strudel.cc.
-    var initFn = S.initStrudel || S.initstrudel;
-    if (!initFn) {
-      throw new Error("initStrudel not found on strudel global");
-    }
+// Debug: log what's available
+console.log("[StrudelSandbox] strudel keys:", Object.keys(window.strudel || {}));
 
-    return initFn({ prebake: S.prebake })
-      .then(function() {
-        // Ensure AudioContext is running
-        var getCtx = S.getAudioContext;
-        if (typeof getCtx === "function") {
-          var ctx = getCtx();
-          if (ctx.state === "suspended") return ctx.resume();
-        }
-      })
-      .then(function() {
-        setupAnalyser();
-        isReady = true;
-        parent.postMessage({ type: "ready" }, "*");
-      });
-  } catch (err) {
-    parent.postMessage({ type: "error", message: "init failed: " + String(err) }, "*");
-    return Promise.reject(err);
+// --- Detect readiness ---
+// The web component handles AudioContext init on first user click.
+// We poll for the editor to be available and AudioContext to be running.
+
+function tryGetAudioContext() {
+  // Try multiple access paths
+  if (typeof getAudioContext === "function") return getAudioContext();
+  var e = repl.editor;
+  if (e) {
+    if (typeof e.getAudioContext === "function") return e.getAudioContext();
+    if (e.repl && typeof e.repl.getAudioContext === "function") return e.repl.getAudioContext();
+  }
+  // Search through the global strudel object
+  var S = window.strudel || {};
+  if (typeof S.getAudioContext === "function") return S.getAudioContext();
+  return null;
+}
+
+function checkReady() {
+  if (isReady) return;
+  var ctx = tryGetAudioContext();
+  if (ctx && ctx.state === "running") {
+    isReady = true;
+    clearInterval(readyPoll);
+    console.log("[StrudelSandbox] ready! AudioContext:", ctx.state);
+    setupAnalyser(ctx);
+    parent.postMessage({ type: "ready" }, "*");
   }
 }
 
-function setupAnalyser() {
-  try {
-    var getCtx = S.getAudioContext;
-    var getCtrl = S.getSuperdoughAudioController;
-    if (typeof getCtx !== "function" || typeof getCtrl !== "function") {
-      console.warn("[StrudelSandbox] analyser exports not found");
-      return;
-    }
+var readyPoll = setInterval(checkReady, 300);
 
-    var ctx = getCtx();
+// Also check shortly after user gestures (the component inits on click)
+["click", "keydown", "touchstart"].forEach(function(evt) {
+  document.addEventListener(evt, function() {
+    setTimeout(checkReady, 500);
+    setTimeout(checkReady, 1500);
+    setTimeout(checkReady, 3000);
+  });
+});
+
+// --- FFT Analysis ---
+
+function setupAnalyser(ctx) {
+  try {
     analyser = ctx.createAnalyser();
     analyser.fftSize = FFT_SIZE;
     analyser.smoothingTimeConstant = 0.4;
 
-    var ctrl = getCtrl();
-    if (ctrl && ctrl.output && ctrl.output.destinationGain) {
-      ctrl.output.destinationGain.connect(analyser);
-    } else {
+    // Try to connect to superdough's output
+    function tryConnect() {
+      var S = window.strudel || {};
+      var getCtrl = S.getSuperdoughAudioController;
+      if (typeof getCtrl !== "function") {
+        // Try global
+        if (typeof getSuperdoughAudioController === "function") getCtrl = getSuperdoughAudioController;
+        else return false;
+      }
+      var ctrl = getCtrl();
+      if (ctrl && ctrl.output && ctrl.output.destinationGain) {
+        ctrl.output.destinationGain.connect(analyser);
+        return true;
+      }
+      return false;
+    }
+
+    if (!tryConnect()) {
       var retries = 0;
       var iv = setInterval(function() {
         retries++;
-        var c = getCtrl();
-        if (c && c.output && c.output.destinationGain) {
-          c.output.destinationGain.connect(analyser);
-          clearInterval(iv);
-          startFftLoop(ctx);
-        } else if (retries >= 10) {
-          clearInterval(iv);
-        }
+        if (tryConnect()) { clearInterval(iv); startFftLoop(ctx); }
+        else if (retries >= 20) clearInterval(iv);
       }, 200);
       return;
     }
     startFftLoop(ctx);
   } catch (err) {
-    console.warn("[StrudelSandbox] analyser setup error:", err);
+    console.warn("[StrudelSandbox] analyser error:", err);
   }
 }
 
 function startFftLoop(ctx) {
   if (rafId !== null || !analyser) return;
-
   var bufLen = analyser.frequencyBinCount;
   var dataArr = new Float32Array(bufLen);
   var binHz = ctx.sampleRate / FFT_SIZE;
@@ -131,9 +150,7 @@ function startFftLoop(ctx) {
   }
   var fft = new Float32Array(NUM_BINS);
   var timeData = new Float32Array(analyser.fftSize);
-  var lastSend = 0;
-  var SEND_IV = 33;
-  var SCOPE_N = 512;
+  var lastSend = 0, SCOPE_N = 512;
 
   function loop() {
     analyser.getFloatFrequencyData(dataArr);
@@ -144,7 +161,7 @@ function startFftLoop(ctx) {
       fft[i] = Math.max(0, Math.min(1, (sum / cnt + 70) / 60));
     }
     var now = performance.now();
-    if (now - lastSend >= SEND_IV) {
+    if (now - lastSend >= 33) {
       lastSend = now;
       analyser.getFloatTimeDomainData(timeData);
       var step = Math.floor(timeData.length / SCOPE_N);
@@ -153,82 +170,75 @@ function startFftLoop(ctx) {
       var FN = 256, fStep = Math.floor(bufLen / FN);
       var freq = new Float32Array(FN);
       for (var i = 0; i < FN; i++) freq[i] = dataArr[i * fStep];
-      parent.postMessage({
-        type: "audio",
-        fft: Array.from(fft),
-        scope: Array.from(scope),
-        freq: Array.from(freq),
-      }, "*");
+      parent.postMessage({ type: "audio", fft: Array.from(fft), scope: Array.from(scope), freq: Array.from(freq) }, "*");
     }
     rafId = requestAnimationFrame(loop);
   }
   loop();
 }
 
-// User gesture to unlock AudioContext
-var initInProgress = false;
-function onUserGesture() {
-  if (initInProgress) return;
-  initInProgress = true;
-  doInit().then(function() {
-    document.removeEventListener("click", onUserGesture);
-    document.removeEventListener("keydown", onUserGesture);
-    document.removeEventListener("touchstart", onUserGesture);
-  })["catch"](function() {
-    initInProgress = false;
-  });
-}
-document.addEventListener("click", onUserGesture);
-document.addEventListener("keydown", onUserGesture);
-document.addEventListener("touchstart", onUserGesture);
+// --- postMessage bridge ---
 
-// postMessage bridge
 window.addEventListener("message", function(e) {
   var d = e.data || {};
 
-  if (d.type === "init") {
-    doInit();
-    return;
-  }
-
   if (d.type === "eval") {
-    if (!isReady) {
+    if (!isReady || !repl.editor) {
       parent.postMessage({ type: "error", message: "not initialized" }, "*");
       return;
     }
-    var evalFn = S.evaluate;
-    if (typeof evalFn !== "function") {
-      parent.postMessage({ type: "error", message: "evaluate not available" }, "*");
-      return;
-    }
-    evalFn(d.code)
-      .then(function() {
-        parent.postMessage({ type: "ack" }, "*");
-        if (!rafId && analyser) {
-          var ctx = S.getAudioContext();
-          var ctrl = S.getSuperdoughAudioController();
-          if (ctrl && ctrl.output && ctrl.output.destinationGain) {
-            try { ctrl.output.destinationGain.connect(analyser); } catch(x){}
-            startFftLoop(ctx);
-          }
-        } else if (!analyser) {
-          setupAnalyser();
+    try {
+      // Set code on the component
+      repl.setAttribute("code", d.code);
+      // Try to trigger evaluation via the editor
+      var editor = repl.editor;
+      var evalP;
+      if (typeof editor.evaluate === "function") {
+        evalP = editor.evaluate(d.code);
+      } else if (editor.repl && typeof editor.repl.evaluate === "function") {
+        evalP = editor.repl.evaluate(d.code);
+      } else {
+        // Fallback: try global evaluate
+        if (typeof evaluate === "function") {
+          evalP = evaluate(d.code);
+        } else {
+          parent.postMessage({ type: "error", message: "no evaluate function found" }, "*");
+          return;
         }
-      })
-      ["catch"](function(err) {
-        parent.postMessage({ type: "error", message: String(err) }, "*");
-      });
+      }
+      // Handle promise or sync result
+      Promise.resolve(evalP)
+        .then(function() {
+          parent.postMessage({ type: "ack" }, "*");
+          // Retry analyser connection after first eval
+          if (!rafId) {
+            var ctx = tryGetAudioContext();
+            if (ctx) setupAnalyser(ctx);
+          }
+        })
+        ["catch"](function(err) {
+          parent.postMessage({ type: "error", message: String(err) }, "*");
+        });
+    } catch (err) {
+      parent.postMessage({ type: "error", message: String(err) }, "*");
+    }
     return;
   }
 
   if (d.type === "hush") {
     try {
-      var hushFn = S.hush;
-      if (typeof hushFn === "function") hushFn();
+      var editor = repl.editor;
+      if (editor && typeof editor.stop === "function") editor.stop();
+      else if (typeof hush === "function") hush();
       parent.postMessage({ type: "ack" }, "*");
     } catch (err) {
       parent.postMessage({ type: "error", message: String(err) }, "*");
     }
+    return;
+  }
+
+  if (d.type === "init") {
+    // The web component handles init via user gesture — nothing extra needed
     return;
   }
 });
