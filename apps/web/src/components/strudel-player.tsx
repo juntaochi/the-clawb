@@ -117,13 +117,18 @@ export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps
         src="/sandbox/strudel-sandbox.html"
         onLoad={() => setIframeLoaded(true)}
         style={started ? {
-          width: 0,
-          height: 0,
-          border: "none",
+          // After init: fullscreen between Hydra (z-0) and UI (z-10).
+          // Shows pianoroll/visualization canvas, transparent background.
           position: "fixed",
-          top: -9999,
-          left: -9999,
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          border: "none",
+          zIndex: 5,
+          pointerEvents: "none",
+          background: "transparent",
         } : {
+          // Before init: fullscreen + nearly transparent to capture user gesture
           position: "fixed",
           inset: 0,
           width: "100%",
@@ -132,7 +137,6 @@ export function StrudelPlayer({ code, onReady, onAudioData }: StrudelPlayerProps
           zIndex: 60,
           opacity: 0.01,
           cursor: "pointer",
-          // Block clicks until iframe JS is loaded so gestures aren't lost
           pointerEvents: iframeLoaded ? "auto" : "none",
         }}
         title="Strudel audio sandbox"
