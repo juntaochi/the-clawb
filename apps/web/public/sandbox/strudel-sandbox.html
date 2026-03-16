@@ -5,22 +5,20 @@
 <style>
   * { margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
-  /* Full strudel-editor: code + inline visualization (pianoroll, scope, pitchwheel).
-     CodeMirror is visible (read-only), visualizations render interleaved with code
-     exactly like strudel.cc. */
-  strudel-editor { display: block; width: 100%; height: 100%; background: transparent; }
-  /* Make editor read-only — code is controlled by the parent via postMessage */
-  .cm-editor { background: transparent !important; }
+  /* The strudel-editor component creates .cm-editor in a plain <div>
+     directly under <body>, NOT inside the custom element. We must style
+     that body-level container to fill the viewport. */
+  body > div { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; }
+  .cm-editor { height: 100% !important; background: rgba(0,0,0,0.5) !important; }
+  .cm-scroller { overflow: auto !important; background: transparent !important; }
+  /* Read-only: hide cursor, selection, gutters */
   .cm-editor .cm-cursor { display: none !important; }
   .cm-editor .cm-selectionBackground { display: none !important; }
   .cm-editor .cm-activeLineGutter, .cm-editor .cm-activeLine { background: transparent !important; }
   .cm-editor .cm-gutters { display: none !important; }
-  .cm-scroller { overflow: auto !important; }
   .cm-content { caret-color: transparent !important; }
   /* Hide play/stop/settings buttons */
   button { display: none !important; }
-  /* Transparent background so Hydra shows through */
-  .cm-editor .cm-scroller { background: transparent !important; }
 </style>
 </head>
 <body>
