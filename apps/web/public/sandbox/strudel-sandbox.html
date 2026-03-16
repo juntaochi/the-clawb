@@ -6,6 +6,21 @@
   * { margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
 </style>
+<!--
+  Import map: @strudel/web@1.3.0 ships with @strudel/core inlined.
+  Other @strudel packages (soundfonts, draw) import @strudel/core as a
+  separate module, creating a duplicate instance and a split registry.
+  This import map redirects bare specifiers so every package resolves to
+  the SAME core/webaudio that lives inside the @strudel/web bundle.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "@strudel/core": "https://esm.sh/@strudel/web@1.3.0/es2022/web.mjs",
+    "@strudel/webaudio": "https://esm.sh/@strudel/web@1.3.0/es2022/web.mjs"
+  }
+}
+</script>
 </head>
 <body>
 <script type="module">
@@ -26,7 +41,7 @@ let rafId = null;
 
 async function doInit() {
   try {
-    // Single import — avoids duplicate @strudel/core from separate esm.sh imports.
+    // Core engine — must succeed for audio to work.
     strudel = await import("https://esm.sh/@strudel/web@1.3.0");
 
     // initStrudel with a custom prebake that mirrors the official @strudel/repl.
@@ -34,41 +49,38 @@ async function doInit() {
     await strudel.initStrudel({
       prebake: async () => {
         // GitHub raw URLs (all serve Access-Control-Allow-Origin: *)
-        // JSON files already contain correct _base pointing to GitHub.
         const ds = "https://raw.githubusercontent.com/felixroos/dough-samples/main";
         const ts = "https://raw.githubusercontent.com/todepond/samples/main";
         const tc = "https://raw.githubusercontent.com/tidalcycles/uzu-drumkit/main";
 
-        // Register no-op stubs for @strudel/draw visualization methods.
-        // The sandbox is audio-only — no canvas to render on. Importing
-        // @strudel/draw separately from esm.sh would duplicate @strudel/core.
-        if (strudel.Pattern) {
-          const noop = function() { return this; };
-          [
-            "pianoroll", "_pianoroll", "pitchwheel", "_pitchwheel",
-            "punchcard", "_punchcard", "spiral", "_spiral",
-            "wordfall", "_wordfall", "scope", "_scope",
-            "draw", "animate", "onPaint", "getPainters", "color",
-          ].forEach(m => {
-            if (!strudel.Pattern.prototype[m]) strudel.Pattern.prototype[m] = noop;
-          });
-        }
-
-        // Register GM soundfont instruments (gm_kalimba, gm_epiano1, etc.)
-        // Use ?bundle-deps to bundle soundfont2 directly, avoiding esm.sh
-        // mis-resolving the soundfont2 version as a separate module.
-        const sfPromise = import("https://esm.sh/@strudel/soundfonts@1.3.0?bundle-deps")
+        // GM soundfonts — try import map + ?external first (single core instance),
+        // fall back to ?bundle-deps (duplicate core, but audio still works).
+        const sfPromise = import("https://esm.sh/@strudel/soundfonts@1.3.0?external=@strudel/core,@strudel/webaudio")
+          .catch(() => import("https://esm.sh/@strudel/soundfonts@1.3.0?bundle-deps"))
           .then(({ registerSoundfonts }) => registerSoundfonts())
           .catch(err => console.warn("[StrudelSandbox] soundfonts unavailable:", err));
 
+        // @strudel/draw — real visualization methods (pianoroll, scope, etc.)
+        // Non-blocking: if unavailable, register no-op stubs so code doesn't throw.
+        const drawPromise = import("https://esm.sh/@strudel/draw@1.2.6?external=@strudel/core")
+          .catch(() => {
+            // Fallback: register no-op stubs for visualization methods
+            if (strudel.Pattern) {
+              const noop = function() { return this; };
+              ["pianoroll","_pianoroll","scope","_scope","punchcard","_punchcard",
+               "spiral","_spiral","wordfall","_wordfall","pitchwheel","_pitchwheel",
+               "draw","animate","onPaint","getPainters","color"].forEach(m => {
+                if (!strudel.Pattern.prototype[m]) strudel.Pattern.prototype[m] = noop;
+              });
+            }
+          });
+
         await Promise.all([
           sfPromise,
-          // Register ZZFX chip-tune sounds
+          drawPromise,
           strudel.registerZZFXSounds(),
-          // Sample packs — all from GitHub with CORS support
           strudel.samples(`${ds}/tidal-drum-machines.json`),
           strudel.samples(`${ds}/piano.json`),
-          // Full dirt-samples (218 entries) — dough-samples only has a 9-entry subset
           strudel.samples("github:tidalcycles/dirt-samples"),
           strudel.samples(`${ds}/vcsl.json`),
           strudel.samples(`${ds}/mridangam.json`),
@@ -80,8 +92,7 @@ async function doInit() {
 
         // Convenience method for piano sounds (matches strudel.cc REPL)
         if (strudel.Pattern && !strudel.Pattern.prototype.piano) {
-          const noteToMidi = strudel.noteToMidi;
-          const maxPan = noteToMidi("C8");
+          const maxPan = strudel.noteToMidi("C8");
           strudel.Pattern.prototype.piano = function () {
             return this.fmap((v) => ({ ...v, clip: v.clip ?? 1 }))
               .s("piano").release(0.1)
