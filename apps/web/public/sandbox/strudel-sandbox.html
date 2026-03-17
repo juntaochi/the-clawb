@@ -16,7 +16,12 @@
   /* Fill viewport */
   body > div { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; }
   .cm-editor { height: 100% !important; }
-  .cm-scroller { overflow: auto !important; }
+  .cm-scroller { overflow-x: hidden !important; overflow-y: overlay !important; scrollbar-gutter: stable !important; }
+  .cm-scroller::-webkit-scrollbar { width: 4px !important; background: transparent !important; }
+  .cm-scroller::-webkit-scrollbar-thumb { background: rgba(255,255,255,0) !important; border-radius: 2px !important; transition: background 0.3s !important; }
+  .cm-scroller:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25) !important; }
+  .cm-scroller::-webkit-scrollbar-track { background: transparent !important; }
+  .cm-content { white-space: pre-wrap !important; word-break: break-all !important; }
   /* Per-line dark backdrop — only text lines get a background */
   .cm-line { background: rgba(0,0,0,0.55) !important; width: fit-content !important; padding: 1px 4px !important; }
   /* Read-only: hide cursor, selection, gutters */
