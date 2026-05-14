@@ -1,4 +1,5 @@
-export const DEFAULT_DJ_CODE = `samples({
+export const DEFAULT_DJ_CODE = `samples('github:tidalcycles/dirt-samples')
+samples({
   'slap': 'https://cdn.freesound.org/previews/495/495416_10350281-lq.mp3',
   'whirl': 'https://cdn.freesound.org/previews/495/495313_10350281-lq.mp3',
   'attack': 'https://cdn.freesound.org/previews/494/494947_10350281-lq.mp3'

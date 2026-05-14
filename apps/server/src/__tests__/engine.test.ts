@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SessionEngine } from "../session-engine/engine.js";
 import { createEventBus, type ClubEventBus } from "../event-bus.js";
-import type { SessionConfig } from "@the-clawb/shared";
+import { DEFAULT_DJ_CODE, type SessionConfig } from "@the-clawb/shared";
 
 const config: SessionConfig = {
   durationMs: 60_000,
@@ -37,6 +37,11 @@ describe("SessionEngine", () => {
     expect(state.vj.status).toBe("idle");
     expect(state.dj.code).toContain("note");
     expect(state.vj.code).toContain("shape");
+  });
+
+  it("loads the Dirt sample bank required by the default breakbeat", () => {
+    expect(DEFAULT_DJ_CODE).toContain("samples('github:tidalcycles/dirt-samples')");
+    expect(DEFAULT_DJ_CODE).toContain('s("breaks165:1/2")');
   });
 
   it("books a slot and queues agent", () => {

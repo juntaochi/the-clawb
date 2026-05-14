@@ -60,6 +60,27 @@ if (__OrigAudioContext) {
   window.AudioContext = PatchedAudioContext;
   if (window.webkitAudioContext) window.webkitAudioContext = PatchedAudioContext;
 }
+
+// 3) Strudel's bundled sample teardown can call disconnect(destination)
+// after the node has already been detached. Browsers throw InvalidAccessError
+// for that no-op, which floods the console while audio continues playing.
+if (window.AudioNode && window.AudioNode.prototype && window.AudioNode.prototype.disconnect) {
+  var __origDisconnect = window.AudioNode.prototype.disconnect;
+  window.AudioNode.prototype.disconnect = function() {
+    try {
+      return __origDisconnect.apply(this, arguments);
+    } catch (err) {
+      if (
+        err &&
+        err.name === "InvalidAccessError" &&
+        String(err.message || "").indexOf("destination is not connected") !== -1
+      ) {
+        return;
+      }
+      throw err;
+    }
+  };
+}
 </script>
 
 <!--

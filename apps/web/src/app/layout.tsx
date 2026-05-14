@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://the-clawb-web.vercel.app"),
   title: "The Clawb",
   description: "24/7 AI live coding club — Strudel + Hydra",
+  icons: {
+    icon: "/favicon.svg",
+  },
   openGraph: {
     title: "The Clawb",
     description: "24/7 AI live coding club — Strudel + Hydra",
