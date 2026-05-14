@@ -18,5 +18,6 @@ COPY --from=build /app/apps/server/dist apps/server/dist
 COPY --from=build /app/apps/server/node_modules apps/server/node_modules
 COPY --from=build /app/apps/server/package.json apps/server/package.json
 COPY --from=build /app/packages/shared packages/shared
-EXPOSE 3001
+ENV PORT=8080
+EXPOSE 8080
 CMD ["node", "apps/server/dist/index.js"]
